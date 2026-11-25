@@ -193,8 +193,9 @@ export function App() {
   const filledCount = resiList.filter(isResiFilled).length;
 
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col bg-slate-100 text-slate-900">
-      {/* Top Application Header (Colorful & Clear Action Hierarchy) */}
+    <>
+      <div className="no-print min-h-screen lg:h-screen flex flex-col bg-slate-100 text-slate-900">
+        {/* Top Application Header (Colorful & Clear Action Hierarchy) */}
       <header className="no-print sticky top-0 z-30 bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white shadow-md px-4 lg:px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-9 w-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -426,31 +427,9 @@ export function App() {
         </div>
       )}
 
-      {/* Off-screen Unscaled A3 Export Target + Native Print Surface */}
-      <div
-        aria-hidden="true"
-        className="print-only-sheet"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: '-10000px',
-          pointerEvents: 'none',
-          zIndex: -1,
-        }}
-      >
-        <A3Sheet
-          ref={exportRef}
-          items={resiList}
-          sender={sender}
-          gridCapacity={gridCapacity}
-          showCutLines={showCutLines}
-          isExport={true}
-        />
-      </div>
-
       {/* Toast Notification */}
       {toast && (
-        <div className="no-print fixed bottom-16 lg:bottom-5 right-4 z-50 flex items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-xs font-medium text-white shadow-lg ring-1 ring-white/10">
+        <div className="fixed bottom-16 lg:bottom-5 right-4 z-50 flex items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-xs font-medium text-white shadow-lg ring-1 ring-white/10">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
           <span>{toast.message}</span>
           {toast.undoItems && (
@@ -471,7 +450,20 @@ export function App() {
           )}
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Off-screen Unscaled A4 Export Target + Native Print Surface (outside .no-print) */}
+      <div aria-hidden="true" className="print-only-sheet offscreen-print-sheet">
+        <A3Sheet
+          ref={exportRef}
+          items={resiList}
+          sender={sender}
+          gridCapacity={gridCapacity}
+          showCutLines={showCutLines}
+          isExport={true}
+        />
+      </div>
+    </>
   );
 }
 
