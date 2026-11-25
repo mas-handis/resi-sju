@@ -1,5 +1,4 @@
 import React, { useLayoutEffect, useRef } from 'react';
-import { DEFAULT_SENDER_HEADER } from '../constants';
 import { GridCapacity, ResiItem, SenderHeader } from '../types';
 import { SuaraMuhammadiyahLogo } from './SuaraMuhammadiyahLogo';
 
@@ -43,6 +42,12 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   const hasNoHp = item.noHp.trim().length > 0;
   const hasBarang = item.namaBarang.trim().length > 0;
   const hasCatatanKanan = item.catatanKanan.trim().length > 0;
+
+  // Refs for auto-fitting Kop Pengirim text lines to fill column width
+  const kopBoxRef = useRef<HTMLDivElement | null>(null);
+  const kopTitleRef = useRef<HTMLDivElement | null>(null);
+  const kopAddrRef = useRef<HTMLDivElement | null>(null);
+  const kopContactRef = useRef<HTMLDivElement | null>(null);
 
   // Refs for auto-fitting Kepada + Alamat + No HP to fill available space
   const kepadaBoxRef = useRef<HTMLDivElement | null>(null);
@@ -150,9 +155,39 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     }
   }, [item.namaBarang, item.catatanKanan, gridCapacity, hasBarang, hasCatatanKanan, isFourRow]);
 
-  const showSeparateTitle =
-    Boolean(sender.logoDataUrl) ||
-    sender.title.trim().toUpperCase() !== DEFAULT_SENDER_HEADER.title.toUpperCase();
+  useLayoutEffect(() => {
+    const box = kopBoxRef.current;
+    if (!box) return;
+    const availW = box.clientWidth;
+    if (availW <= 0) return;
+
+    const fitLineToWidth = (
+      el: HTMLDivElement | null,
+      minSize: number,
+      maxSize: number
+    ) => {
+      if (!el) return;
+      let low = minSize;
+      let high = maxSize;
+      let best = minSize;
+      while (low <= high) {
+        const mid = (low + high) / 2;
+        el.style.fontSize = `${mid}px`;
+        if (el.scrollWidth <= availW) {
+          best = mid;
+          low = mid + 0.5;
+        } else {
+          high = mid - 0.5;
+        }
+        if (high - low < 0.4) break;
+      }
+      el.style.fontSize = `${Math.floor(best * 10) / 10}px`;
+    };
+
+    fitLineToWidth(kopTitleRef.current, 13, isFourRow ? 28 : 25);
+    fitLineToWidth(kopAddrRef.current, 10, isFourRow ? 19 : 17.5);
+    fitLineToWidth(kopContactRef.current, 8.5, isFourRow ? 14 : 13);
+  }, [sender.title, sender.address, sender.phone, sender.email, sender.logoDataUrl, gridCapacity, isFourRow]);
 
   return (
     <div
@@ -193,8 +228,8 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              gap: '12px',
-              padding: isFourRow ? '8px 14px' : '6px 12px',
+              gap: '10px',
+              padding: isFourRow ? '7px 12px' : '5px 10px',
               borderBottom: '1.5px solid #000000',
               backgroundColor: '#FFFFFF',
               flexShrink: 0,
@@ -202,7 +237,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
           >
             <SuaraMuhammadiyahLogo
               logoDataUrl={sender.logoDataUrl}
-              height={isFourRow ? 46 : 38}
+              height={isFourRow ? 54 : 46}
             />
             <div
               style={{
@@ -213,42 +248,56 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 flexShrink: 0,
               }}
             />
-            <div style={{ minWidth: 0, flex: 1 }}>
-              {showSeparateTitle && (
-                <div
-                  style={{
-                    fontSize: isFourRow ? '15px' : '13.5px',
-                    fontWeight: 900,
-                    letterSpacing: '0.03em',
-                    lineHeight: 1.15,
-                    color: '#000000',
-                    marginBottom: '1px',
-                  }}
-                >
-                  {sender.title}
-                </div>
-              )}
+            <div
+              ref={kopBoxRef}
+              style={{
+                minWidth: 0,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
               <div
+                ref={kopTitleRef}
                 style={{
-                  fontSize: isFourRow ? '12px' : '11px',
+                  fontSize: isFourRow ? '24px' : '22px',
+                  fontWeight: 900,
+                  letterSpacing: '0.03em',
+                  lineHeight: 1.08,
+                  color: '#000000',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {sender.title}
+              </div>
+              <div
+                ref={kopAddrRef}
+                style={{
+                  fontSize: isFourRow ? '16px' : '15px',
                   fontWeight: 700,
-                  lineHeight: 1.28,
+                  lineHeight: 1.2,
                   color: '#111827',
+                  marginTop: '2px',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {sender.address}
               </div>
               <div
+                ref={kopContactRef}
                 style={{
-                  fontSize: isFourRow ? '10.5px' : '9.5px',
+                  fontSize: isFourRow ? '12.5px' : '11.5px',
                   fontWeight: 600,
-                  lineHeight: 1.28,
+                  lineHeight: 1.2,
                   color: '#374151',
                   marginTop: '1px',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {sender.phone ? `Telp. ${sender.phone}` : ''}
-                {sender.phone && sender.email ? '  |  ' : ''}
+                {sender.phone && sender.email ? ' | ' : ''}
                 {sender.email ? `Email: ${sender.email}` : ''}
               </div>
             </div>
