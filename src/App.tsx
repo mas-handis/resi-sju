@@ -162,7 +162,7 @@ export function App() {
     const samples = createSampleResiList().slice(0, gridCapacity);
     setResiList(samples);
     setActiveResiId(samples[0]?.id ?? null);
-    showToast('Contoh 3 resi Suara Muhammadiyah dimuat.');
+    showToast(`Contoh ${samples.length} resi TK ABA dimuat.`);
   };
 
   const handleSelectSlot = (id: string) => {

@@ -32,32 +32,52 @@ export function createSampleResiList(): ResiItem[] {
     {
       id: crypto.randomUUID(),
       kepada:
-        "TK Aisyiyah Pa'baeng Baeng\nJl. Sultan Alauddin No. 12, Kec. Tamalate\nKota Makassar, Sulawesi Selatan",
-      noHp: '0812-4567-8901',
+        'TK ABA Kauman Yogyakarta\nJl. Kauman GM I/163, Ngupasan, Kec. Gondomanan, Kota Yogyakarta, DI Yogyakarta 55122',
+      noHp: '0812-2780-1919',
       namaBarang: 'MAP LAMA KARTON TK 6.800 EXP',
       catatanKanan: 'JNE',
+      dari: '45',
+      koliKe: '101',
+    },
+    {
+      id: crypto.randomUUID(),
+      kepada:
+        "TK ABA Pa'baeng Baeng Makassar\nJl. Sultan Alauddin No. 12, Tamalate, Kota Makassar, Sulawesi Selatan",
+      noHp: '0812-4567-8901',
+      namaBarang: 'BUKU PAKET TK ABA SEMESTER GENAP',
+      catatanKanan: 'POS',
       dari: '62',
       koliKe: '110',
     },
     {
       id: crypto.randomUUID(),
       kepada:
-        "TK Aisyiyah Pa'baeng Baeng\nJl. Sultan Alauddin No. 12, Kec. Tamalate\nKota Makassar, Sulawesi Selatan",
-      noHp: '0812-4567-8901',
-      namaBarang: 'MAP LAMA KARTON TK 6.800 EXP',
-      catatanKanan: 'JNE',
-      dari: '62',
-      koliKe: '111',
+        'TK ABA 24 Malang\nJl. Galunggung No. 57, Gading Kasri, Kec. Klojen, Kota Malang, Jawa Timur 65115',
+      noHp: '0813-3456-7824',
+      namaBarang: 'MAJALAH KUNTUM & LKS PAUD 1.500 EXP',
+      catatanKanan: 'KILAT',
+      dari: '12',
+      koliKe: '25',
     },
     {
       id: crypto.randomUUID(),
       kepada:
-        'SD Muhammadiyah Sapen\nJl. Bimo Kurdo No. 33, Demangan, Kec. Gondokusuman\nKota Yogyakarta, DI Yogyakarta 55221',
-      noHp: '(0274) 512689',
-      namaBarang: 'BUKU PAKET ISMUBA SEMESTER GENAP 1.250 EXP',
-      catatanKanan: 'EXP',
+        'TK ABA 01 Surakarta\nJl. RM Said No. 136, Punggawan, Kec. Banjarsari, Kota Surakarta, Jawa Tengah 57132',
+      noHp: '0856-4712-3301',
+      namaBarang: 'RAPOR KURIKULUM MERDEKA TK ABA',
+      catatanKanan: 'J&T',
       dari: '18',
-      koliKe: '90',
+      koliKe: '48',
+    },
+    {
+      id: crypto.randomUUID(),
+      kepada:
+        'TK ABA 14 Surabaya\nJl. Tambak Segaran Wetan No. 17, Tambaksari, Kota Surabaya, Jawa Timur 60135',
+      noHp: '0815-5092-1414',
+      namaBarang: 'SERAGAM BATIK & ATRIBUT TK ABA',
+      catatanKanan: 'CARGO',
+      dari: '30',
+      koliKe: '73',
     },
   ];
 }
