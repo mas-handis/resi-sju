@@ -26,21 +26,23 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onCh
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+    <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200/80">
         <div className="flex items-center gap-2">
-          <Lock className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-emerald-600 text-white">
+            <Lock className="w-3 h-3" />
+          </span>
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-900">
             Kop Pengirim
           </span>
-          <span className="inline-flex items-center rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+          <span className="inline-flex items-center rounded-full bg-emerald-600/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
             Otomatis
           </span>
         </div>
         <button
           type="button"
           onClick={() => setIsEditing((prev) => !prev)}
-          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+          className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200 hover:bg-white hover:text-emerald-900 transition-colors"
         >
           {isEditing ? (
             <>

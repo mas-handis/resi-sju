@@ -57,14 +57,14 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   const scaledHeight = A4_PX_HEIGHT * effectiveScale;
 
   return (
-    <div className="flex flex-col h-full bg-slate-200/75">
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-200/90 via-sky-100/70 to-emerald-100/60">
       {/* Preview Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-white/90 backdrop-blur border-b border-slate-200">
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-white/95 backdrop-blur border-b border-slate-200 shadow-xs">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-md bg-indigo-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm">
             Live Preview A4
           </span>
-          <span className="hidden sm:inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+          <span className="hidden sm:inline-flex items-center rounded-md bg-sky-50 border border-sky-200 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
             210 × 297 mm • Portrait
           </span>
         </div>
@@ -72,7 +72,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           {/* 4 or 5 Resi Grid Toggle */}
           <div
-            className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5"
+            className="inline-flex rounded-lg border border-indigo-200 bg-indigo-50/70 p-0.5"
             role="group"
             aria-label="Kapasitas grid per halaman A4"
           >
@@ -83,10 +83,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
                   key={cap}
                   type="button"
                   onClick={() => onChangeGridCapacity(cap)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                     active
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-indigo-700 hover:bg-indigo-100/80'
                   }`}
                 >
                   {cap} Resi
@@ -99,10 +99,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           <button
             type="button"
             onClick={onToggleCutLines}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
               showCutLines
-                ? 'border-slate-300 bg-white text-slate-800 shadow-sm'
-                : 'border-transparent bg-slate-100 text-slate-500 hover:text-slate-700'
+                ? 'border-amber-300 bg-amber-50 text-amber-900 shadow-sm'
+                : 'border-slate-200 bg-slate-100 text-slate-500 hover:text-slate-700'
             }`}
             title="Tampilkan atau sembunyikan garis bantu potong antar resi"
           >
