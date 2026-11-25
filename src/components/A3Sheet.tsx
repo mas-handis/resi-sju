@@ -37,6 +37,7 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
     return (
       <div
         ref={ref}
+        data-export-sheet={isExport ? 'true' : undefined}
         style={{
           width: `${A3_PX_WIDTH}px`,
           height: `${A3_PX_HEIGHT}px`,

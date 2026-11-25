@@ -1,4 +1,4 @@
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { A3_HEIGHT_MM, A3_PX_HEIGHT, A3_PX_WIDTH, A3_WIDTH_MM } from '../constants';
 
@@ -10,24 +10,56 @@ function buildTimestamp(): string {
   )}${pad(now.getMinutes())}`;
 }
 
+async function waitForImages(root: HTMLElement): Promise<void> {
+  const images = Array.from(root.querySelectorAll('img'));
+  await Promise.all(
+    images.map(async (img) => {
+      if (!img.complete) {
+        await new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        });
+      }
+      if (typeof img.decode === 'function') {
+        await img.decode().catch(() => {});
+      }
+    })
+  );
+}
+
 async function renderSheetToDataUrl(element: HTMLElement): Promise<string> {
-  // Ensure web fonts are loaded before rasterizing
   if (document.fonts && document.fonts.ready) {
     await document.fonts.ready;
   }
 
-  return toPng(element, {
+  await waitForImages(element);
+
+  // Use html2canvas with scale: 2 (2246x3174px ≈ 7.1 MP) so mobile browsers
+  // (especially iOS Safari) reliably draw embedded PNG logos without hitting canvas limits.
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: false,
+    backgroundColor: '#FFFFFF',
     width: A3_PX_WIDTH,
     height: A3_PX_HEIGHT,
-    pixelRatio: 2.5, // ~240 DPI crisp print quality for A3 (2808 x 3968 px)
-    backgroundColor: '#FFFFFF',
-    cacheBust: true,
-    skipFonts: true, // Resi uses crisp system print fonts (Arial/Helvetica); avoids CORS stylesheet issues offline/online
-    style: {
-      transform: 'none',
-      transformOrigin: 'top left',
+    windowWidth: A3_PX_WIDTH,
+    windowHeight: A3_PX_HEIGHT,
+    scrollX: 0,
+    scrollY: 0,
+    logging: false,
+    onclone: (clonedDoc) => {
+      const clonedSheet = clonedDoc.querySelector('[data-export-sheet="true"]') as HTMLElement | null;
+      if (clonedSheet && clonedSheet.parentElement) {
+        clonedSheet.parentElement.style.left = '0px';
+        clonedSheet.parentElement.style.top = '0px';
+        clonedSheet.parentElement.style.position = 'static';
+      }
     },
   });
+
+  return canvas.toDataURL('image/png');
 }
 
 export async function downloadA3Png(element: HTMLElement): Promise<string> {
