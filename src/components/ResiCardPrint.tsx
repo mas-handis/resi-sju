@@ -12,10 +12,10 @@ interface ResiCardPrintProps {
 
 function getCodeFontSize(value: string, isFourRow: boolean): number {
   const len = value.trim().length;
-  if (len <= 3) return isFourRow ? 62 : 52;
-  if (len <= 5) return isFourRow ? 48 : 40;
-  if (len <= 7) return isFourRow ? 36 : 30;
-  return isFourRow ? 26 : 22;
+  if (len <= 3) return isFourRow ? 44 : 36;
+  if (len <= 5) return isFourRow ? 34 : 28;
+  if (len <= 7) return isFourRow ? 26 : 22;
+  return isFourRow ? 20 : 16;
 }
 
 function formatPhoneDisplay(raw: string): string {
@@ -26,7 +26,7 @@ function formatPhoneDisplay(raw: string): string {
   return `No. HP: ${trimmed}`;
 }
 
-const RIGHT_COL_WIDTH = 196;
+const RIGHT_COL_WIDTH = 148;
 
 export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   item,
@@ -67,9 +67,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     if (availH <= 0 || availW <= 0) return;
 
     const applySize = (baseSize: number) => {
-      const firstSize = Math.round(baseSize * 1.15);
-      const gapSmall = Math.max(3, Math.round(baseSize * 0.16));
-      const gapPhone = Math.max(4, Math.round(baseSize * 0.24));
+      const firstSize = Math.round(baseSize * 1.14);
+      const gapSmall = Math.max(2, Math.round(baseSize * 0.14));
+      const gapPhone = Math.max(3, Math.round(baseSize * 0.22));
 
       if (firstLineRef.current) {
         firstLineRef.current.style.fontSize = `${firstSize}px`;
@@ -84,8 +84,8 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       }
     };
 
-    const minSize = 13;
-    const maxSize = isFourRow ? 54 : 44;
+    const minSize = 10;
+    const maxSize = isFourRow ? 42 : 34;
 
     let low = minSize;
     let high = maxSize;
@@ -95,7 +95,6 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       const mid = Math.floor((low + high) / 2);
       applySize(mid);
 
-      // Compare against inner box dimensions (minus 2px safety margin)
       const fitsHeight = content.scrollHeight <= availH - 2;
       const fitsWidth = content.scrollWidth <= availW + 1;
 
@@ -144,15 +143,13 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     };
 
     if (hasBarang) {
-      fitSingleBox(barangBoxRef.current, barangTextRef.current, 14, isFourRow ? 40 : 35);
+      fitSingleBox(barangBoxRef.current, barangTextRef.current, 11, isFourRow ? 30 : 25);
     }
     if (hasCatatanKanan) {
-      fitSingleBox(kananBoxRef.current, kananTextRef.current, 13, isFourRow ? 36 : 32);
+      fitSingleBox(kananBoxRef.current, kananTextRef.current, 10, isFourRow ? 26 : 22);
     }
   }, [item.namaBarang, item.catatanKanan, gridCapacity, hasBarang, hasCatatanKanan, isFourRow]);
 
-  // Default Logo SM already includes "SUARA MUHAMMADIYAH" wordmark.
-  // Only render a separate title line if user uploaded a custom logo or customized the title.
   const showSeparateTitle =
     Boolean(sender.logoDataUrl) ||
     sender.title.trim().toUpperCase() !== DEFAULT_SENDER_HEADER.title.toUpperCase();
@@ -162,7 +159,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       style={{
         width: '100%',
         height: '100%',
-        border: '2.5px solid #000000',
+        border: '2px solid #000000',
         backgroundColor: '#FFFFFF',
         display: 'flex',
         flexDirection: 'column',
@@ -196,16 +193,16 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              gap: '16px',
-              padding: isFourRow ? '10px 18px' : '7px 16px',
-              borderBottom: '2px solid #000000',
+              gap: '12px',
+              padding: isFourRow ? '8px 14px' : '6px 12px',
+              borderBottom: '1.5px solid #000000',
               backgroundColor: '#FFFFFF',
               flexShrink: 0,
             }}
           >
             <SuaraMuhammadiyahLogo
               logoDataUrl={sender.logoDataUrl}
-              height={isFourRow ? 58 : 48}
+              height={isFourRow ? 46 : 38}
             />
             <div
               style={{
@@ -220,12 +217,12 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               {showSeparateTitle && (
                 <div
                   style={{
-                    fontSize: isFourRow ? '20px' : '18px',
+                    fontSize: isFourRow ? '15px' : '13.5px',
                     fontWeight: 900,
                     letterSpacing: '0.03em',
                     lineHeight: 1.15,
                     color: '#000000',
-                    marginBottom: '2px',
+                    marginBottom: '1px',
                   }}
                 >
                   {sender.title}
@@ -233,9 +230,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               )}
               <div
                 style={{
-                  fontSize: isFourRow ? '15.5px' : '14px',
+                  fontSize: isFourRow ? '12px' : '11px',
                   fontWeight: 700,
-                  lineHeight: 1.3,
+                  lineHeight: 1.28,
                   color: '#111827',
                 }}
               >
@@ -243,11 +240,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               </div>
               <div
                 style={{
-                  fontSize: isFourRow ? '13.5px' : '12.5px',
+                  fontSize: isFourRow ? '10.5px' : '9.5px',
                   fontWeight: 600,
-                  lineHeight: 1.3,
+                  lineHeight: 1.28,
                   color: '#374151',
-                  marginTop: '2px',
+                  marginTop: '1px',
                 }}
               >
                 {sender.phone ? `Telp. ${sender.phone}` : ''}
@@ -265,20 +262,20 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'stretch',
-              padding: isFourRow ? '12px 18px' : '9px 16px',
-              gap: '12px',
+              padding: isFourRow ? '9px 14px' : '7px 12px',
+              gap: '8px',
               overflow: 'hidden',
             }}
           >
             <div
               style={{
-                width: '94px',
+                width: '72px',
                 flexShrink: 0,
-                fontSize: isFourRow ? '17px' : '15.5px',
+                fontSize: isFourRow ? '13px' : '12px',
                 fontWeight: 800,
                 letterSpacing: '0.04em',
                 color: '#111827',
-                paddingTop: '4px',
+                paddingTop: '3px',
               }}
             >
               KEPADA :
@@ -307,9 +304,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                       <div
                         ref={firstLineRef}
                         style={{
-                          fontSize: isFourRow ? '32px' : '27px',
+                          fontSize: isFourRow ? '24px' : '20px',
                           fontWeight: 800,
-                          lineHeight: 1.18,
+                          lineHeight: 1.16,
                           color: '#000000',
                           wordBreak: 'break-word',
                         }}
@@ -320,11 +317,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                         <div
                           ref={restLinesRef}
                           style={{
-                            fontSize: isFourRow ? '28px' : '23px',
+                            fontSize: isFourRow ? '20px' : '17px',
                             fontWeight: 700,
-                            lineHeight: 1.24,
+                            lineHeight: 1.22,
                             color: '#111827',
-                            marginTop: '4px',
+                            marginTop: '3px',
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-word',
                           }}
@@ -339,11 +336,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                     <div
                       ref={noHpRef}
                       style={{
-                        fontSize: isFourRow ? '28px' : '23px',
+                        fontSize: isFourRow ? '20px' : '17px',
                         fontWeight: 800,
-                        lineHeight: 1.24,
+                        lineHeight: 1.22,
                         color: '#000000',
-                        marginTop: hasKepada ? '6px' : '0px',
+                        marginTop: hasKepada ? '4px' : '0px',
                         wordBreak: 'break-word',
                       }}
                     >
@@ -354,7 +351,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               ) : !isExport ? (
                 <div
                   style={{
-                    fontSize: isFourRow ? '17px' : '15.5px',
+                    fontSize: isFourRow ? '13.5px' : '12.5px',
                     fontStyle: 'italic',
                     color: '#94A3B8',
                   }}
@@ -371,7 +368,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
           style={{
             width: `${RIGHT_COL_WIDTH}px`,
             flexShrink: 0,
-            borderLeft: '2.5px solid #000000',
+            borderLeft: '2px solid #000000',
             display: 'flex',
             flexDirection: 'column',
           }}
@@ -380,7 +377,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
           <div
             style={{
               flex: 1,
-              borderBottom: '2px solid #000000',
+              borderBottom: '1.5px solid #000000',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -389,9 +386,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               style={{
                 borderBottom: '1px solid #000000',
                 backgroundColor: '#F3F4F6',
-                padding: isFourRow ? '5px 8px' : '4px 8px',
+                padding: isFourRow ? '4px 6px' : '3px 6px',
                 textAlign: 'center',
-                fontSize: isFourRow ? '12.5px' : '11.5px',
+                fontSize: isFourRow ? '10.5px' : '9.5px',
                 fontWeight: 800,
                 letterSpacing: '0.09em',
                 color: '#000000',
@@ -406,7 +403,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '4px 8px',
+                padding: '3px 6px',
               }}
             >
               {item.koliKe.trim() ? (
@@ -423,7 +420,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                   {item.koliKe}
                 </span>
               ) : !isExport ? (
-                <span style={{ fontSize: '28px', fontWeight: 700, color: '#CBD5E1' }}>—</span>
+                <span style={{ fontSize: '22px', fontWeight: 700, color: '#CBD5E1' }}>—</span>
               ) : null}
             </div>
           </div>
@@ -440,9 +437,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               style={{
                 borderBottom: '1px solid #000000',
                 backgroundColor: '#F3F4F6',
-                padding: isFourRow ? '5px 8px' : '4px 8px',
+                padding: isFourRow ? '4px 6px' : '3px 6px',
                 textAlign: 'center',
-                fontSize: isFourRow ? '12.5px' : '11.5px',
+                fontSize: isFourRow ? '10.5px' : '9.5px',
                 fontWeight: 800,
                 letterSpacing: '0.09em',
                 color: '#000000',
@@ -457,7 +454,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '4px 8px',
+                padding: '3px 6px',
               }}
             >
               {item.dari.trim() ? (
@@ -474,7 +471,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                   {item.dari}
                 </span>
               ) : !isExport ? (
-                <span style={{ fontSize: '28px', fontWeight: 700, color: '#CBD5E1' }}>—</span>
+                <span style={{ fontSize: '22px', fontWeight: 700, color: '#CBD5E1' }}>—</span>
               ) : null}
             </div>
           </div>
@@ -484,10 +481,10 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       {/* Bottom Row: Left = Pesanan (Yellow, Centered, Auto-fit), Right Corner Row 3 = Kolom Kuning (Editable, Centered) */}
       <div
         style={{
-          borderTop: '2px solid #000000',
+          borderTop: '1.5px solid #000000',
           display: 'flex',
           flexDirection: 'row',
-          height: isFourRow ? '68px' : '58px',
+          height: isFourRow ? '52px' : '44px',
           flexShrink: 0,
         }}
       >
@@ -497,7 +494,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
             flex: 1,
             minWidth: 0,
             backgroundColor: '#FFEB00',
-            padding: isFourRow ? '6px 16px' : '5px 14px',
+            padding: isFourRow ? '4px 12px' : '4px 10px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -511,7 +508,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               ref={barangTextRef}
               style={{
                 width: '100%',
-                fontSize: isFourRow ? '34px' : '30px',
+                fontSize: isFourRow ? '26px' : '22px',
                 fontWeight: 900,
                 letterSpacing: '0.02em',
                 lineHeight: 1.12,
@@ -531,7 +528,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 opacity: 0.55,
                 fontWeight: 700,
                 fontStyle: 'italic',
-                fontSize: isFourRow ? '20px' : '18px',
+                fontSize: isFourRow ? '15px' : '14px',
                 textAlign: 'center',
               }}
             >
@@ -548,9 +545,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
           style={{
             width: `${RIGHT_COL_WIDTH}px`,
             flexShrink: 0,
-            borderLeft: '2.5px solid #000000',
+            borderLeft: '2px solid #000000',
             backgroundColor: '#FFEB00',
-            padding: '5px 10px',
+            padding: '4px 8px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -564,7 +561,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               ref={kananTextRef}
               style={{
                 width: '100%',
-                fontSize: isFourRow ? '32px' : '28px',
+                fontSize: isFourRow ? '24px' : '20px',
                 fontWeight: 900,
                 letterSpacing: '0.02em',
                 lineHeight: 1.12,
@@ -583,7 +580,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 opacity: 0.5,
                 fontWeight: 700,
                 fontStyle: 'italic',
-                fontSize: '14px',
+                fontSize: '12px',
               }}
             >
               —

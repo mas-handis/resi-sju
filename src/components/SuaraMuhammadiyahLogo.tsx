@@ -17,10 +17,11 @@ export const SuaraMuhammadiyahLogo: React.FC<SuaraMuhammadiyahLogoProps> = ({
 
   const isDefault = !logoDataUrl;
   const ratio = isDefault ? DEFAULT_LOGO_SM_ASPECT_RATIO : customRatio;
-  const computedWidth = ratio ? Math.min(Math.round(height * ratio), 220) : undefined;
+  const maxWidth = 175;
+  const computedWidth = ratio ? Math.min(Math.round(height * ratio), maxWidth) : undefined;
   const computedHeight =
-    ratio && Math.round(height * ratio) > 220
-      ? Math.round(220 / ratio)
+    ratio && Math.round(height * ratio) > maxWidth
+      ? Math.round(maxWidth / ratio)
       : height;
 
   return (
@@ -40,7 +41,7 @@ export const SuaraMuhammadiyahLogo: React.FC<SuaraMuhammadiyahLogoProps> = ({
       style={{
         height: `${computedHeight}px`,
         width: computedWidth ? `${computedWidth}px` : 'auto',
-        maxWidth: '220px',
+        maxWidth: `${maxWidth}px`,
         objectFit: 'contain',
         display: 'block',
         flexShrink: 0,

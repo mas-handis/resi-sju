@@ -104,7 +104,7 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
             title={
               canDuplicate
                 ? 'Duplikat data resi ini (cocok jika tujuan sama, hanya beda Koli Ke)'
-                : 'Kapasitas halaman A3 sudah penuh'
+                : 'Kapasitas halaman A4 sudah penuh'
             }
             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:border-slate-300 disabled:opacity-40 disabled:pointer-events-none transition-colors"
           >

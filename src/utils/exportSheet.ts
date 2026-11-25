@@ -1,6 +1,6 @@
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { A3_HEIGHT_MM, A3_PX_HEIGHT, A3_PX_WIDTH, A3_WIDTH_MM } from '../constants';
+import { A4_HEIGHT_MM, A4_PX_HEIGHT, A4_PX_WIDTH, A4_WIDTH_MM } from '../constants';
 
 function buildTimestamp(): string {
   const now = new Date();
@@ -35,17 +35,17 @@ async function renderSheetToDataUrl(element: HTMLElement): Promise<string> {
 
   await waitForImages(element);
 
-  // Use html2canvas with scale: 2 (2246x3174px ≈ 7.1 MP) so mobile browsers
-  // (especially iOS Safari) reliably draw embedded PNG logos without hitting canvas limits.
+  // Use html2canvas with scale: 3 on A4 (2382x3369px ≈ 8.0 MP, ~288 DPI)
+  // for crisp print quality while staying safely under mobile Safari canvas limits.
   const canvas = await html2canvas(element, {
-    scale: 2,
+    scale: 3,
     useCORS: true,
     allowTaint: false,
     backgroundColor: '#FFFFFF',
-    width: A3_PX_WIDTH,
-    height: A3_PX_HEIGHT,
-    windowWidth: A3_PX_WIDTH,
-    windowHeight: A3_PX_HEIGHT,
+    width: A4_PX_WIDTH,
+    height: A4_PX_HEIGHT,
+    windowWidth: A4_PX_WIDTH,
+    windowHeight: A4_PX_HEIGHT,
     scrollX: 0,
     scrollY: 0,
     logging: false,
@@ -62,9 +62,9 @@ async function renderSheetToDataUrl(element: HTMLElement): Promise<string> {
   return canvas.toDataURL('image/png');
 }
 
-export async function downloadA3Png(element: HTMLElement): Promise<string> {
+export async function downloadA4Png(element: HTMLElement): Promise<string> {
   const dataUrl = await renderSheetToDataUrl(element);
-  const filename = `resi-suara-muhammadiyah-A3-${buildTimestamp()}.png`;
+  const filename = `resi-suara-muhammadiyah-A4-${buildTimestamp()}.png`;
 
   const link = document.createElement('a');
   link.download = filename;
@@ -76,18 +76,18 @@ export async function downloadA3Png(element: HTMLElement): Promise<string> {
   return filename;
 }
 
-export async function downloadA3Pdf(element: HTMLElement): Promise<string> {
+export async function downloadA4Pdf(element: HTMLElement): Promise<string> {
   const dataUrl = await renderSheetToDataUrl(element);
-  const filename = `resi-suara-muhammadiyah-A3-${buildTimestamp()}.pdf`;
+  const filename = `resi-suara-muhammadiyah-A4-${buildTimestamp()}.pdf`;
 
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: 'a3',
+    format: 'a4',
     compress: true,
   });
 
-  pdf.addImage(dataUrl, 'PNG', 0, 0, A3_WIDTH_MM, A3_HEIGHT_MM, undefined, 'FAST');
+  pdf.addImage(dataUrl, 'PNG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, 'FAST');
   pdf.save(filename);
 
   return filename;

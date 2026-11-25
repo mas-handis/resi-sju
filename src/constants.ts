@@ -1,11 +1,11 @@
 import { ResiItem, SenderHeader } from './types';
 
-export const A3_WIDTH_MM = 297;
-export const A3_HEIGHT_MM = 420;
+export const A4_WIDTH_MM = 210;
+export const A4_HEIGHT_MM = 297;
 
-// Exact A3 portrait pixel dimensions at 96 DPI (297/25.4*96 ≈ 1122.5, 420/25.4*96 ≈ 1587.4)
-export const A3_PX_WIDTH = 1123;
-export const A3_PX_HEIGHT = 1587;
+// Exact A4 portrait pixel dimensions at 96 DPI (210/25.4*96 ≈ 793.7, 297/25.4*96 ≈ 1122.5)
+export const A4_PX_WIDTH = 794;
+export const A4_PX_HEIGHT = 1123;
 
 export const DEFAULT_SENDER_HEADER: SenderHeader = {
   title: 'SUARA MUHAMMADIYAH',

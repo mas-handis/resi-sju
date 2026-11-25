@@ -22,7 +22,7 @@ import {
   DEFAULT_SENDER_HEADER,
 } from './constants';
 import { GridCapacity, ResiItem, SenderHeader } from './types';
-import { downloadA3Pdf, downloadA3Png } from './utils/exportSheet';
+import { downloadA4Pdf, downloadA4Png } from './utils/exportSheet';
 
 interface ToastState {
   message: string;
@@ -179,8 +179,8 @@ export function App() {
     try {
       const filename =
         type === 'pdf'
-          ? await downloadA3Pdf(exportRef.current)
-          : await downloadA3Png(exportRef.current);
+          ? await downloadA4Pdf(exportRef.current)
+          : await downloadA4Png(exportRef.current);
       showToast(`Berhasil mengunduh ${filename}`);
     } catch (err) {
       console.error('Export failed:', err);
@@ -236,7 +236,7 @@ export function App() {
             type="button"
             onClick={() => window.print()}
             className="hidden xl:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-            title="Cetak langsung ke printer kertas A3"
+            title="Cetak langsung ke printer kertas A4"
           >
             <Printer className="w-3.5 h-3.5" />
             Cetak
@@ -299,7 +299,7 @@ export function App() {
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
-            Pratinjau A3
+            Pratinjau A4
           </button>
         </div>
       </div>
@@ -369,7 +369,7 @@ export function App() {
               >
                 <Plus className="w-4 h-4" />
                 {resiList.length >= gridCapacity
-                  ? `Halaman A3 Penuh (Maks. ${gridCapacity} Resi)`
+                  ? `Halaman A4 Penuh (Maks. ${gridCapacity} Resi)`
                   : `Tambah Resi (${resiList.length}/${gridCapacity})`}
               </button>
               <p className="mt-2 text-center text-[11px] text-slate-400">
@@ -407,7 +407,7 @@ export function App() {
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white py-2.5 text-xs font-semibold text-slate-800"
           >
             <Eye className="w-4 h-4" />
-            Lihat Pratinjau A3
+            Lihat Pratinjau A4
           </button>
           <button
             type="button"

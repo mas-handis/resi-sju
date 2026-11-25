@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Maximize2, Scissors, ZoomIn, ZoomOut } from 'lucide-react';
-import { A3_PX_HEIGHT, A3_PX_WIDTH } from '../constants';
+import { A4_PX_HEIGHT, A4_PX_WIDTH } from '../constants';
 import { GridCapacity, ResiItem, SenderHeader } from '../types';
 import { A3Sheet } from './A3Sheet';
 
@@ -40,10 +40,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       const availW = Math.max(rect.width - padX, 240);
       const availH = Math.max(rect.height - padY, 320);
 
-      const scaleW = availW / A3_PX_WIDTH;
-      const scaleH = availH / A3_PX_HEIGHT;
-      const nextFit = Math.min(scaleW, scaleH, 0.85);
-      setFitScale(Math.max(nextFit, 0.22));
+      const scaleW = availW / A4_PX_WIDTH;
+      const scaleH = availH / A4_PX_HEIGHT;
+      const nextFit = Math.min(scaleW, scaleH, 1.0);
+      setFitScale(Math.max(nextFit, 0.25));
     };
 
     computeScale();
@@ -53,8 +53,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   }, []);
 
   const effectiveScale = fitScale * zoomMultiplier;
-  const scaledWidth = A3_PX_WIDTH * effectiveScale;
-  const scaledHeight = A3_PX_HEIGHT * effectiveScale;
+  const scaledWidth = A4_PX_WIDTH * effectiveScale;
+  const scaledHeight = A4_PX_HEIGHT * effectiveScale;
 
   return (
     <div className="flex flex-col h-full bg-slate-200/75">
@@ -62,10 +62,10 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="flex items-center gap-2.5">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-            Live Preview A3
+            Live Preview A4
           </span>
           <span className="hidden sm:inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-            297 × 420 mm • Portrait
+            210 × 297 mm • Portrait
           </span>
         </div>
 
@@ -74,7 +74,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           <div
             className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5"
             role="group"
-            aria-label="Kapasitas grid per halaman A3"
+            aria-label="Kapasitas grid per halaman A4"
           >
             {([5, 4] as GridCapacity[]).map((cap) => {
               const active = gridCapacity === cap;
@@ -141,7 +141,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         </div>
       </div>
 
-      {/* Scaled A3 Paper Viewport */}
+      {/* Scaled A4 Paper Viewport */}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto custom-scrollbar flex items-start justify-center p-5"
@@ -157,8 +157,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         >
           <div
             style={{
-              width: `${A3_PX_WIDTH}px`,
-              height: `${A3_PX_HEIGHT}px`,
+              width: `${A4_PX_WIDTH}px`,
+              height: `${A4_PX_HEIGHT}px`,
               transform: `scale(${effectiveScale})`,
               transformOrigin: 'top left',
             }}

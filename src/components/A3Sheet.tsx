@@ -1,5 +1,5 @@
 import React from 'react';
-import { A3_PX_HEIGHT, A3_PX_WIDTH } from '../constants';
+import { A4_PX_HEIGHT, A4_PX_WIDTH } from '../constants';
 import { GridCapacity, ResiItem, SenderHeader } from '../types';
 import { ResiCardPrint } from './ResiCardPrint';
 
@@ -26,10 +26,10 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
     },
     ref
   ) => {
-    // 10mm left/right margins ≈ 38px; ~7.5mm top/bottom margins ≈ 28px
-    const horizontalMarginPx = 38;
-    const verticalMarginPx = 28;
-    const usableHeightPx = A3_PX_HEIGHT - verticalMarginPx * 2;
+    // ~7.5mm left/right margins ≈ 28px; ~6mm top/bottom margins ≈ 22px on A4
+    const horizontalMarginPx = 28;
+    const verticalMarginPx = 22;
+    const usableHeightPx = A4_PX_HEIGHT - verticalMarginPx * 2;
     const slotHeightPx = usableHeightPx / gridCapacity;
 
     const slots = Array.from({ length: gridCapacity }, (_, index) => items[index] ?? null);
@@ -39,8 +39,8 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
         ref={ref}
         data-export-sheet={isExport ? 'true' : undefined}
         style={{
-          width: `${A3_PX_WIDTH}px`,
-          height: `${A3_PX_HEIGHT}px`,
+          width: `${A4_PX_WIDTH}px`,
+          height: `${A4_PX_HEIGHT}px`,
           backgroundColor: '#FFFFFF',
           padding: `${verticalMarginPx}px ${horizontalMarginPx}px`,
           boxSizing: 'border-box',
@@ -67,8 +67,8 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
                 width: '100%',
                 position: 'relative',
                 boxSizing: 'border-box',
-                paddingTop: index === 0 ? '0px' : '9px',
-                paddingBottom: isLastSlot ? '0px' : '9px',
+                paddingTop: index === 0 ? '0px' : '6px',
+                paddingBottom: isLastSlot ? '0px' : '6px',
                 display: 'flex',
                 flexDirection: 'column',
               }}
