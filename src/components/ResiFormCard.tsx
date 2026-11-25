@@ -203,7 +203,7 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                 htmlFor={`catatan-kanan-${item.id}`}
                 className="block text-xs font-semibold text-slate-700"
               >
-                Pojok Kanan
+                Nomor Pojok
               </label>
               <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold bg-[#FFEB00] text-slate-900 border border-amber-400/70">
                 Kuning
@@ -212,11 +212,12 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
             <input
               id={`catatan-kanan-${item.id}`}
               type="text"
+              inputMode="numeric"
               value={item.catatanKanan}
               onFocus={onFocus}
-              onChange={(e) => onChange({ catatanKanan: e.target.value })}
-              placeholder="Misal: JNE / EXP"
-              className="w-full rounded-lg border border-slate-300 bg-amber-50/40 px-3 py-2 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:border-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              onChange={(e) => onChange({ catatanKanan: e.target.value.replace(/[^\d]/g, '') })}
+              placeholder="12"
+              className="w-full rounded-lg border border-slate-300 bg-amber-50/40 px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             />
           </div>
         </div>

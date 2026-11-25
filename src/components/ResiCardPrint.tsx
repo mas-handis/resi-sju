@@ -72,9 +72,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     if (availH <= 0 || availW <= 0) return;
 
     const applySize = (baseSize: number) => {
-      const firstSize = Math.round(baseSize * 1.14);
+      const firstSize = Math.round(baseSize * 1.12);
       const gapSmall = Math.max(2, Math.round(baseSize * 0.14));
-      const gapPhone = Math.max(3, Math.round(baseSize * 0.22));
+      const gapPhone = Math.max(3, Math.round(baseSize * 0.2));
 
       if (firstLineRef.current) {
         firstLineRef.current.style.fontSize = `${firstSize}px`;
@@ -90,7 +90,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     };
 
     const minSize = 10;
-    const maxSize = isFourRow ? 42 : 34;
+    const maxSize = isFourRow ? 44 : 36;
 
     let low = minSize;
     let high = maxSize;
@@ -184,9 +184,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       el.style.fontSize = `${Math.floor(best * 10) / 10}px`;
     };
 
-    fitLineToWidth(kopTitleRef.current, 13, isFourRow ? 28 : 25);
-    fitLineToWidth(kopAddrRef.current, 10, isFourRow ? 19 : 17.5);
-    fitLineToWidth(kopContactRef.current, 8.5, isFourRow ? 14 : 13);
+    fitLineToWidth(kopTitleRef.current, 11, isFourRow ? 17 : 15);
+    fitLineToWidth(kopAddrRef.current, 9.5, isFourRow ? 12.5 : 11);
+    fitLineToWidth(kopContactRef.current, 8.5, isFourRow ? 10.5 : 9.5);
   }, [sender.title, sender.address, sender.phone, sender.email, sender.logoDataUrl, gridCapacity, isFourRow]);
 
   return (
@@ -229,7 +229,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               flexDirection: 'row',
               alignItems: 'center',
               gap: '10px',
-              padding: isFourRow ? '7px 12px' : '5px 10px',
+              padding: isFourRow ? '5px 12px' : '4px 10px',
               borderBottom: '1.5px solid #000000',
               backgroundColor: '#FFFFFF',
               flexShrink: 0,
@@ -237,14 +237,14 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
           >
             <SuaraMuhammadiyahLogo
               logoDataUrl={sender.logoDataUrl}
-              height={isFourRow ? 54 : 46}
+              height={isFourRow ? 42 : 34}
             />
             <div
               style={{
                 width: '1.5px',
                 alignSelf: 'stretch',
                 backgroundColor: '#D1D5DB',
-                margin: '2px 0',
+                margin: '1px 0',
                 flexShrink: 0,
               }}
             />
@@ -262,10 +262,10 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               <div
                 ref={kopTitleRef}
                 style={{
-                  fontSize: isFourRow ? '24px' : '22px',
+                  fontSize: isFourRow ? '17px' : '15px',
                   fontWeight: 900,
                   letterSpacing: '0.03em',
-                  lineHeight: 1.08,
+                  lineHeight: 1.1,
                   color: '#000000',
                   whiteSpace: 'nowrap',
                 }}
@@ -275,11 +275,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               <div
                 ref={kopAddrRef}
                 style={{
-                  fontSize: isFourRow ? '16px' : '15px',
+                  fontSize: isFourRow ? '12.5px' : '11px',
                   fontWeight: 700,
                   lineHeight: 1.2,
                   color: '#111827',
-                  marginTop: '2px',
+                  marginTop: '1px',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -288,7 +288,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               <div
                 ref={kopContactRef}
                 style={{
-                  fontSize: isFourRow ? '12.5px' : '11.5px',
+                  fontSize: isFourRow ? '10.5px' : '9.5px',
                   fontWeight: 600,
                   lineHeight: 1.2,
                   color: '#374151',
@@ -311,18 +311,18 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'stretch',
-              padding: isFourRow ? '9px 14px' : '7px 12px',
-              gap: '8px',
+              padding: isFourRow ? '7px 12px' : '5px 10px',
+              gap: '6px',
               overflow: 'hidden',
             }}
           >
             <div
               style={{
-                width: '72px',
+                width: '64px',
                 flexShrink: 0,
-                fontSize: isFourRow ? '13px' : '12px',
+                fontSize: isFourRow ? '12.5px' : '11.5px',
                 fontWeight: 800,
-                letterSpacing: '0.04em',
+                letterSpacing: '0.03em',
                 color: '#111827',
                 paddingTop: '3px',
               }}
@@ -527,13 +527,13 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
         </div>
       </div>
 
-      {/* Bottom Row: Left = Pesanan (Yellow, Centered, Auto-fit), Right Corner Row 3 = Kolom Kuning (Editable, Centered) */}
+      {/* Bottom Row: Left = Pesanan (Yellow, Centered, Auto-fit), Right Corner Row 3 = Kolom Kuning (Nomor, Centered) */}
       <div
         style={{
           borderTop: '1.5px solid #000000',
           display: 'flex',
           flexDirection: 'row',
-          height: isFourRow ? '52px' : '44px',
+          height: isFourRow ? '48px' : '40px',
           flexShrink: 0,
         }}
       >
@@ -610,12 +610,12 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               ref={kananTextRef}
               style={{
                 width: '100%',
-                fontSize: isFourRow ? '24px' : '20px',
+                fontSize: isFourRow ? '26px' : '22px',
                 fontWeight: 900,
                 letterSpacing: '0.02em',
-                lineHeight: 1.12,
+                lineHeight: 1.08,
                 color: '#000000',
-                textTransform: 'uppercase',
+                fontVariantNumeric: 'tabular-nums',
                 textAlign: 'center',
                 wordBreak: 'break-word',
               }}
