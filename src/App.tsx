@@ -197,12 +197,12 @@ export function App() {
       {/* Top Application Header */}
       <header className="no-print sticky top-0 z-30 bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-9 w-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-extrabold text-sm tracking-tight flex-shrink-0">
-            A3
+          <div className="h-9 w-9 rounded-lg bg-slate-900 text-white flex items-center justify-center flex-shrink-0">
+            <FileText className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate">
-              Generator Resi Pengiriman A3
+            <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate tracking-wide">
+              RESI GENERATOR
             </h1>
             <p className="text-[11px] sm:text-xs text-slate-500 truncate">
               Suara Muhammadiyah • {resiList.length}/{gridCapacity} slot terpasang
