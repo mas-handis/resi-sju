@@ -22,6 +22,8 @@ import {
 function drawSuratJalanCopyPdf(
   doc: jsPDF,
   fontName: string,
+  hasItalic: boolean,
+  hasBoldItalic: boolean,
   data: SuratJalanData,
   sender: SenderHeader,
   logo: ResolvedLogo,
@@ -44,12 +46,12 @@ function drawSuratJalanCopyPdf(
   const padX = 1;
   const innerX = x + padX;
   const innerW = w - padX * 2;
-  let curY = y + 1;
+  let curY = y + 1.5;
 
-  // 1. Header Section
+  // 1. Header Section (Proportional & Well-Sized)
   if (isSju) {
-    const logoMaxH = 14.5;
-    const logoMaxW = 28;
+    const logoMaxH = 16.5;
+    const logoMaxW = 33;
     let logoW = logoMaxH * logo.aspectRatio;
     let logoH = logoMaxH;
     if (logoW > logoMaxW) {
@@ -57,53 +59,68 @@ function drawSuratJalanCopyPdf(
       logoH = logoMaxW / logo.aspectRatio;
     }
 
+    const leftTextX = innerX + logoW + 3.2;
+    const leftTextMaxW = innerW * 0.52 - logoW - 4;
+
+    // Pre-measure left Kop lines
+    doc.setFont(fontName, 'normal');
+    doc.setFontSize(8.2);
+    const addrLines: string[] = doc.splitTextToSize(sanitizePdfText(sender.address), leftTextMaxW);
+
+    let ly = curY + 3.2;
+    doc.setFont(fontName, 'bold');
+    doc.setFontSize(13.5);
+    doc.setTextColor(220, 38, 38);
+    doc.text(sanitizePdfText(sender.title), leftTextX, ly);
+    ly += 3.8;
+
+    doc.setFont(fontName, 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(75, 85, 99);
+    doc.text('PENERBIT & PERCETAKAN', leftTextX, ly);
+    ly += 3.6;
+
+    doc.setFont(fontName, 'normal');
+    doc.setFontSize(8.2);
+    doc.setTextColor(31, 41, 55);
+    addrLines.forEach((line) => {
+      doc.text(line, leftTextX, ly);
+      ly += 3.3;
+    });
+    if (sender.email) {
+      doc.text(sanitizePdfText(`Email: ${sender.email}`), leftTextX, ly);
+      ly += 3.3;
+    }
+    if (sender.phone) {
+      doc.setFont(fontName, 'bold');
+      doc.text(sanitizePdfText(`Telp. ${sender.phone}`), leftTextX, ly);
+      ly += 3.3;
+    }
+
+    const leftEndY = Math.max(ly, curY + logoH);
     try {
-      doc.addImage(logo.dataUrl, logo.format, innerX, curY, logoW, logoH, undefined, 'FAST');
+      doc.addImage(
+        logo.dataUrl,
+        logo.format,
+        innerX,
+        curY + (leftEndY - curY - logoH) / 2,
+        logoW,
+        logoH,
+        undefined,
+        'FAST'
+      );
     } catch {
       // ignore
     }
 
-    const leftTextX = innerX + logoW + 2.8;
-    const leftTextMaxW = innerW * 0.52 - logoW - 4;
-    let ly = curY + 2.8;
-
-    doc.setFont(fontName, 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(220, 38, 38);
-    doc.text(sanitizePdfText(sender.title), leftTextX, ly);
-    ly += 3.2;
-
-    doc.setFont(fontName, 'bold');
-    doc.setFontSize(6.5);
-    doc.setTextColor(75, 85, 99);
-    doc.text('PENERBIT & PERCETAKAN', leftTextX, ly);
-    ly += 3.2;
-
-    doc.setFont(fontName, 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(31, 41, 55);
-    const addrLines: string[] = doc.splitTextToSize(sanitizePdfText(sender.address), leftTextMaxW);
-    addrLines.forEach((line) => {
-      doc.text(line, leftTextX, ly);
-      ly += 2.7;
-    });
-    if (sender.email) {
-      doc.text(sanitizePdfText(`Email: ${sender.email}`), leftTextX, ly);
-      ly += 2.7;
-    }
-    if (sender.phone) {
-      doc.text(sanitizePdfText(`Telp. ${sender.phone}`), leftTextX, ly);
-      ly += 2.7;
-    }
-
     // Right: KEPADA, ALAMAT, NO. TLP
     const rightX = innerX + innerW * 0.54;
-    const labelW = 15.5;
+    const labelW = 16.5;
     const valX = rightX + labelW + 2.5;
     const valW = innerX + innerW - valX;
-    let ry = curY + 2.8;
+    let ry = curY + 3.5;
 
-    doc.setFontSize(8.5);
+    doc.setFontSize(9.5);
     doc.setTextColor(0, 0, 0);
 
     doc.setFont(fontName, 'bold');
@@ -112,7 +129,7 @@ function drawSuratJalanCopyPdf(
     const kepadaWrapped: string[] = doc.splitTextToSize(sanitizePdfText(data.kepada || '-'), valW);
     kepadaWrapped.forEach((line) => {
       doc.text(line, valX, ry);
-      ry += 3.4;
+      ry += 3.9;
     });
 
     doc.text('ALAMAT', rightX, ry);
@@ -121,25 +138,25 @@ function drawSuratJalanCopyPdf(
     const alamatWrapped: string[] = doc.splitTextToSize(sanitizePdfText(data.alamat || '-'), valW);
     alamatWrapped.slice(0, 4).forEach((line) => {
       doc.text(line, valX, ry);
-      ry += 3.4;
+      ry += 3.8;
     });
 
     doc.setFont(fontName, 'bold');
     doc.text('NO. TLP', rightX, ry);
     doc.text(':', rightX + labelW, ry);
     doc.text(sanitizePdfText(data.telepon || '-'), valX, ry);
-    ry += 3.5;
+    ry += 3.8;
 
-    curY = Math.max(ly, ry, curY + logoH) + 2;
+    curY = Math.max(leftEndY, ry) + 3.5;
 
     // Centered SURAT JALAN Title + Nomor
     doc.setFont(fontName, 'bold');
-    doc.setFontSize(16.5);
+    doc.setFontSize(19.5);
     doc.setTextColor(0, 0, 0);
-    doc.text('SURAT JALAN', innerX + innerW / 2, curY + 3.5, { align: 'center' });
-    curY += 7.2;
+    doc.text('SURAT JALAN', innerX + innerW / 2, curY + 4, { align: 'center' });
+    curY += 8.2;
 
-    doc.setFontSize(8.8);
+    doc.setFontSize(10);
     const subParts = [
       `No. ${data.nomor || '-'}`,
       data.tanggal ? `Tanggal: ${data.tanggal}` : '',
@@ -148,11 +165,11 @@ function drawSuratJalanCopyPdf(
     doc.text(sanitizePdfText(subParts.join('   •   ')), innerX + innerW / 2, curY, {
       align: 'center',
     });
-    curY += 3.5;
+    curY += 4.2;
   } else {
     // SM Header
-    const logoMaxH = 12.5;
-    const logoMaxW = 29;
+    const logoMaxH = 14.5;
+    const logoMaxW = 33;
     let logoW = logoMaxH * logo.aspectRatio;
     let logoH = logoMaxH;
     if (logoW > logoMaxW) {
@@ -160,53 +177,65 @@ function drawSuratJalanCopyPdf(
       logoH = logoMaxW / logo.aspectRatio;
     }
 
-    try {
-      doc.addImage(logo.dataUrl, logo.format, innerX, curY, logoW, logoH, undefined, 'FAST');
-    } catch {
-      // ignore
-    }
-
-    const kopX = innerX + logoW + 2.8;
-    let ly = curY + 2.8;
+    const kopX = innerX + logoW + 3.2;
+    let ly = curY + 3.2;
     doc.setTextColor(0, 0, 0);
     doc.setFont(fontName, 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(13.5);
     doc.text(sanitizePdfText(sender.title), kopX, ly);
-    ly += 3.2;
+    ly += 3.8;
 
-    doc.setFontSize(7.5);
+    doc.setFontSize(8.8);
     doc.text(sanitizePdfText(sender.address), kopX, ly);
-    ly += 2.9;
+    ly += 3.4;
 
     if (sender.email) {
       doc.setFont(fontName, 'normal');
-      doc.setFontSize(6.8);
+      doc.setFontSize(7.8);
       doc.text(sanitizePdfText(`Email: ${sender.email}`), kopX, ly);
-      ly += 3.1;
+      ly += 3.6;
     }
 
     if (sender.phone) {
       doc.setFont(fontName, 'bold');
-      doc.setFontSize(8.5);
+      doc.setFontSize(9.5);
       doc.text(sanitizePdfText(`Telp. ${sender.phone}`), kopX, ly);
-      ly += 2.6;
+      ly += 3.2;
+    }
+
+    const leftEndY = Math.max(ly, curY + logoH);
+    try {
+      doc.addImage(
+        logo.dataUrl,
+        logo.format,
+        innerX,
+        curY + (leftEndY - curY - logoH) / 2,
+        logoW,
+        logoH,
+        undefined,
+        'FAST'
+      );
+    } catch {
+      // ignore
     }
 
     // Right: SURAT JALAN
     doc.setFont(fontName, 'bold');
-    doc.setFontSize(18.5);
+    doc.setFontSize(21);
     doc.setTextColor(0, 0, 0);
-    doc.text('SURAT JALAN', innerX + innerW - 2, curY + 8.5, { align: 'right' });
+    doc.text('SURAT JALAN', innerX + innerW - 2, curY + (leftEndY - curY) / 2 + 2.2, {
+      align: 'right',
+    });
 
-    curY = Math.max(ly, curY + logoH) + 2;
+    curY = leftEndY + 3;
 
     // SM Metadata 2-Column Bordered Box
     const boxLeftW = innerW * 0.56;
-    const labelWLeft = 15.5;
-    const valXLeft = innerX + 2.5 + labelWLeft + 2;
-    const valWLeft = innerX + boxLeftW - 2.5 - valXLeft;
+    const labelWLeft = 16.5;
+    const valXLeft = innerX + 3 + labelWLeft + 2;
+    const valWLeft = innerX + boxLeftW - 3 - valXLeft;
 
-    doc.setFontSize(8.2);
+    doc.setFontSize(9.2);
     const kepadaWrapped: string[] = doc.splitTextToSize(
       sanitizePdfText(data.kepada || '-'),
       valWLeft
@@ -216,9 +245,9 @@ function drawSuratJalanCopyPdf(
       valWLeft
     );
 
-    const lineStep = 3.4;
+    const lineStep = 3.9;
     const leftLinesCount = kepadaWrapped.length + Math.min(alamatWrapped.length, 4) + 1;
-    const boxH = Math.max(leftLinesCount * lineStep + 4, 15.5);
+    const boxH = Math.max(leftLinesCount * lineStep + 4.5, 19.5);
 
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.4);
@@ -226,17 +255,17 @@ function drawSuratJalanCopyPdf(
     doc.line(innerX + boxLeftW, curY, innerX + boxLeftW, curY + boxH);
 
     // Left Meta Content
-    let my = curY + 4;
+    let my = curY + 4.6;
     doc.setFont(fontName, 'bold');
-    doc.text('KEPADA', innerX + 2.5, my);
-    doc.text(':', innerX + 2.5 + labelWLeft, my);
+    doc.text('KEPADA', innerX + 3, my);
+    doc.text(':', innerX + 3 + labelWLeft, my);
     kepadaWrapped.forEach((line) => {
       doc.text(line, valXLeft, my);
       my += lineStep;
     });
 
-    doc.text('ALAMAT', innerX + 2.5, my);
-    doc.text(':', innerX + 2.5 + labelWLeft, my);
+    doc.text('ALAMAT', innerX + 3, my);
+    doc.text(':', innerX + 3 + labelWLeft, my);
     doc.setFont(fontName, 'normal');
     alamatWrapped.slice(0, 4).forEach((line) => {
       doc.text(line, valXLeft, my);
@@ -244,27 +273,27 @@ function drawSuratJalanCopyPdf(
     });
 
     doc.setFont(fontName, 'bold');
-    doc.text('TELEPON', innerX + 2.5, my);
-    doc.text(':', innerX + 2.5 + labelWLeft, my);
+    doc.text('TELEPON', innerX + 3, my);
+    doc.text(':', innerX + 3 + labelWLeft, my);
     doc.text(sanitizePdfText(data.telepon || '-'), valXLeft, my);
 
     // Right Meta Content (Nomor, Tanggal, Pengirim)
-    const metaRightX = innerX + boxLeftW + 3;
-    const labelWRight = 16;
+    const metaRightX = innerX + boxLeftW + 3.5;
+    const labelWRight = 17;
     const valXRight = metaRightX + labelWRight + 2;
-    let rmy = curY + (boxH - 2 * 4.2) / 2 + 1.2;
+    let rmy = curY + (boxH - 2 * 4.8) / 2 + 1.4;
 
     doc.setFont(fontName, 'bold');
     doc.text('Nomor', metaRightX, rmy);
     doc.text(':', metaRightX + labelWRight, rmy);
     doc.text(sanitizePdfText(data.nomor || '-'), valXRight, rmy);
-    rmy += 4.2;
+    rmy += 4.8;
 
     doc.text('Tanggal', metaRightX, rmy);
     doc.text(':', metaRightX + labelWRight, rmy);
     doc.setFont(fontName, 'normal');
     doc.text(sanitizePdfText(data.tanggal || '-'), valXRight, rmy);
-    rmy += 4.2;
+    rmy += 4.8;
 
     doc.setFont(fontName, 'bold');
     doc.text('Pengirim', metaRightX, rmy);
@@ -272,7 +301,7 @@ function drawSuratJalanCopyPdf(
     doc.setFont(fontName, 'normal');
     doc.text(sanitizePdfText(data.pengirim || ''), valXRight, rmy);
 
-    curY += boxH + 2.8;
+    curY += boxH + 3.5;
   }
 
   // 2. Items Table
@@ -290,6 +319,10 @@ function drawSuratJalanCopyPdf(
           })),
         ];
 
+  const rowCount = displayRows.length;
+  const isCompact = rowCount >= 4;
+  const isVeryCompact = rowCount >= 6;
+
   const colWidths = [
     9.5, // NO.
     innerW * 0.37, // NAMA BARANG
@@ -306,7 +339,8 @@ function drawSuratJalanCopyPdf(
     accX += cw;
   });
 
-  const thH = 5.6;
+  const thH = isVeryCompact ? 5.6 : 6.8;
+  const thPt = isVeryCompact ? 7.8 : 8.8;
   doc.setFillColor(accentRgb[0], accentRgb[1], accentRgb[2]);
   doc.rect(innerX, curY, innerW, thH, 'F');
   doc.setDrawColor(0, 0, 0);
@@ -320,27 +354,27 @@ function drawSuratJalanCopyPdf(
   doc.setFont(fontName, 'bold');
   const thHeaders = ['NO.', 'NAMA BARANG', 'QTY', 'JUMLAH KOLI', 'KETERANGAN'];
   thHeaders.forEach((title, idx) => {
-    drawCenteredLines(doc, [title], colXs[idx] + colWidths[idx] / 2, curY + thH / 2, 7.8, 1.1);
+    drawCenteredLines(doc, [title], colXs[idx] + colWidths[idx] / 2, curY + thH / 2, thPt, 1.1);
   });
   curY += thH;
 
-  const compactRows = displayRows.length >= 4;
-  const rowFontPt = compactRows ? 7.4 : 8.2;
-  const rowLineStep = rowFontPt * PT_TO_MM * 1.22;
+  const rowFontPt = isVeryCompact ? 7.6 : isCompact ? 8.5 : 9.8;
+  const minRowH = isVeryCompact ? 5.0 : isCompact ? 6.2 : 9.5;
+  const rowLineStep = rowFontPt * PT_TO_MM * 1.24;
 
   displayRows.forEach((row, idx) => {
     const barangWrapped: string[] = row.namaBarang.trim()
-      ? doc.splitTextToSize(sanitizePdfText(row.namaBarang.trim()), colWidths[1] - 3)
+      ? doc.splitTextToSize(sanitizePdfText(row.namaBarang.trim()), colWidths[1] - 4)
       : [];
     const ketWrapped: string[] = row.keterangan.trim()
-      ? doc.splitTextToSize(sanitizePdfText(row.keterangan.trim()), colWidths[4] - 3)
+      ? doc.splitTextToSize(sanitizePdfText(row.keterangan.trim()), colWidths[4] - 4)
       : [];
 
     const maxLines = Math.max(1, barangWrapped.length, ketWrapped.length);
-    const rowH = Math.max(compactRows ? 4.8 : 5.6, maxLines * rowLineStep + 2.2);
+    const rowH = Math.max(minRowH, maxLines * rowLineStep + 3.0);
 
     doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.28);
+    doc.setLineWidth(0.3);
     doc.rect(innerX, curY, innerW, rowH, 'S');
     for (let c = 1; c < colXs.length; c += 1) {
       doc.line(colXs[c], curY, colXs[c], curY + rowH);
@@ -358,7 +392,7 @@ function drawSuratJalanCopyPdf(
       doc.setFont(fontName, 'bold');
       doc.setFontSize(rowFontPt);
       barangWrapped.forEach((line, lIdx) => {
-        doc.text(line, colXs[1] + 1.6, firstBase + lIdx * rowLineStep);
+        doc.text(line, colXs[1] + 2.0, firstBase + lIdx * rowLineStep);
       });
     }
 
@@ -393,7 +427,7 @@ function drawSuratJalanCopyPdf(
       doc.setFont(fontName, 'normal');
       doc.setFontSize(rowFontPt);
       ketWrapped.forEach((line, lIdx) => {
-        doc.text(line, colXs[4] + 1.6, firstBase + lIdx * rowLineStep);
+        doc.text(line, colXs[4] + 2.0, firstBase + lIdx * rowLineStep);
       });
     }
 
@@ -405,7 +439,8 @@ function drawSuratJalanCopyPdf(
   const totalKoli = data.rows.reduce((sum, r) => sum + parseIndonesianNumber(r.jumlahKoli), 0);
   const formattedQty = formatIndonesianNumber(totalQty);
   const formattedKoli = formatIndonesianNumber(totalKoli);
-  const totalH = 5.6;
+  const totalH = isVeryCompact ? 5.6 : 6.8;
+  const totalPt = isVeryCompact ? 8.0 : 9.2;
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.35);
@@ -421,11 +456,11 @@ function drawSuratJalanCopyPdf(
     [isSju ? 'TOTAL' : 'TOTAL KOLI'],
     innerX + (colWidths[0] + colWidths[1]) / 2,
     totalMidY,
-    8.2,
+    totalPt,
     1.1
   );
   if (formattedQty) {
-    drawCenteredLines(doc, [formattedQty], colXs[2] + colWidths[2] / 2, totalMidY, 8.2, 1.1);
+    drawCenteredLines(doc, [formattedQty], colXs[2] + colWidths[2] / 2, totalMidY, totalPt, 1.1);
   }
   const koliFooterVal = data.beratPerKoli.trim() || formattedKoli;
   if (koliFooterVal) {
@@ -434,7 +469,7 @@ function drawSuratJalanCopyPdf(
       [sanitizePdfText(koliFooterVal)],
       colXs[3] + colWidths[3] / 2,
       totalMidY,
-      8.2,
+      totalPt,
       1.1
     );
   }
@@ -447,16 +482,16 @@ function drawSuratJalanCopyPdf(
       [sanitizePdfText(ketFooterVal)],
       colXs[4] + colWidths[4] / 2,
       totalMidY,
-      8.2,
+      totalPt,
       1.1
     );
   }
-  curY += totalH + 2.8;
+  curY += totalH + 3.4;
 
   // Note line
   if (data.catatan.trim()) {
-    doc.setFont(fontName, 'normal');
-    doc.setFontSize(7.2);
+    doc.setFont(fontName, hasItalic ? 'italic' : 'normal');
+    doc.setFontSize(8.2);
     if (isSju) {
       doc.setTextColor(31, 41, 55);
     } else {
@@ -468,15 +503,16 @@ function drawSuratJalanCopyPdf(
     );
     noteLines.slice(0, 2).forEach((line) => {
       doc.text(line, innerX, curY);
-      curY += 3;
+      curY += 3.4;
     });
   }
 
-  // 3. Bottom Signature Boxes anchored neatly near bottom of half-page
+  // 3. Bottom Signature Boxes — proportional height & anchored cleanly to half-page bottom
   const bottomLimitY = y + h - 1;
-  const sigHeaderH = 5.4;
-  const sigBodyH = 14.5;
-  const sigTopY = bottomLimitY - 4.2 - (sigHeaderH + sigBodyH);
+  const sigHeaderH = isVeryCompact ? 5.6 : 6.4;
+  const sigHeaderPt = isVeryCompact ? 7.8 : 8.8;
+  const sigBodyH = isVeryCompact ? 14 : isCompact ? 17 : 24;
+  const sigTopY = bottomLimitY - 4.8 - (sigHeaderH + sigBodyH);
 
   doc.setTextColor(0, 0, 0);
   doc.setDrawColor(0, 0, 0);
@@ -496,39 +532,43 @@ function drawSuratJalanCopyPdf(
         doc.line(sx, sigTopY, sx, sigTopY + sigHeaderH + sigBodyH);
       }
       doc.setFont(fontName, 'bold');
-      drawCenteredLines(doc, [label], sx + sigW / 2, sigTopY + sigHeaderH / 2, 7.6, 1.1);
+      drawCenteredLines(doc, [label], sx + sigW / 2, sigTopY + sigHeaderH / 2, sigHeaderPt, 1.1);
 
       doc.setFont(fontName, 'normal');
-      doc.setFontSize(7.6);
-      doc.text('(........................)', sx + sigW / 2, sigTopY + sigHeaderH + sigBodyH - 1.8, {
+      doc.setFontSize(8.5);
+      doc.text('(........................)', sx + sigW / 2, sigTopY + sigHeaderH + sigBodyH - 2, {
         align: 'center',
       });
     });
   } else {
-    // SM: Left box (PENERIMA 36%), gap, Right box (BAGIAN GUDANG | PENGIRIM 64%)
-    const gapSig = 3.8;
+    const gapSig = 4.0;
     const leftSigW = (innerW - gapSig) * 0.36;
     const rightSigW = innerW - gapSig - leftSigW;
     const rightSigX = innerX + leftSigW + gapSig;
     const rightHalfW = rightSigW / 2;
 
-    // Left signature box
     doc.setFillColor(accentRgb[0], accentRgb[1], accentRgb[2]);
     doc.rect(innerX, sigTopY, leftSigW, sigHeaderH, 'F');
     doc.rect(innerX, sigTopY, leftSigW, sigHeaderH + sigBodyH, 'S');
     doc.line(innerX, sigTopY + sigHeaderH, innerX + leftSigW, sigTopY + sigHeaderH);
     doc.setFont(fontName, 'bold');
-    drawCenteredLines(doc, ['PENERIMA'], innerX + leftSigW / 2, sigTopY + sigHeaderH / 2, 7.6, 1.1);
+    drawCenteredLines(
+      doc,
+      ['PENERIMA'],
+      innerX + leftSigW / 2,
+      sigTopY + sigHeaderH / 2,
+      sigHeaderPt,
+      1.1
+    );
     doc.setFont(fontName, 'normal');
-    doc.setFontSize(7.6);
+    doc.setFontSize(8.5);
     doc.text(
       '(............................)',
       innerX + leftSigW / 2,
-      sigTopY + sigHeaderH + sigBodyH - 1.8,
+      sigTopY + sigHeaderH + sigBodyH - 2,
       { align: 'center' }
     );
 
-    // Right signature group
     doc.setFillColor(accentRgb[0], accentRgb[1], accentRgb[2]);
     doc.rect(rightSigX, sigTopY, rightSigW, sigHeaderH, 'F');
     doc.rect(rightSigX, sigTopY, rightSigW, sigHeaderH + sigBodyH, 'S');
@@ -546,7 +586,7 @@ function drawSuratJalanCopyPdf(
       ['BAGIAN GUDANG'],
       rightSigX + rightHalfW / 2,
       sigTopY + sigHeaderH / 2,
-      7.6,
+      sigHeaderPt,
       1.1
     );
     drawCenteredLines(
@@ -554,36 +594,36 @@ function drawSuratJalanCopyPdf(
       ['PENGIRIM'],
       rightSigX + rightHalfW + rightHalfW / 2,
       sigTopY + sigHeaderH / 2,
-      7.6,
+      sigHeaderPt,
       1.1
     );
 
     doc.setFont(fontName, 'normal');
-    doc.setFontSize(7.6);
+    doc.setFontSize(8.5);
     doc.text(
       '(............................)',
       rightSigX + rightHalfW / 2,
-      sigTopY + sigHeaderH + sigBodyH - 1.8,
+      sigTopY + sigHeaderH + sigBodyH - 2,
       { align: 'center' }
     );
     doc.text(
       '(............................)',
       rightSigX + rightHalfW + rightHalfW / 2,
-      sigTopY + sigHeaderH + sigBodyH - 1.8,
+      sigTopY + sigHeaderH + sigBodyH - 2,
       { align: 'center' }
     );
   }
 
   // Footnote & Copy Role Indicator
-  const footY = bottomLimitY - 0.5;
-  doc.setFont(fontName, 'normal');
-  doc.setFontSize(7);
+  const footY = bottomLimitY - 0.6;
+  doc.setFont(fontName, hasItalic ? 'italic' : 'normal');
+  doc.setFontSize(8);
   doc.setTextColor(31, 41, 55);
   doc.text(sanitizePdfText(data.footnote), innerX, footY);
 
   if (data.showCopyLabels) {
-    doc.setFont(fontName, 'bold');
-    doc.setFontSize(7.5);
+    doc.setFont(fontName, hasBoldItalic ? 'bolditalic' : 'bold');
+    doc.setFontSize(8.5);
     doc.setTextColor(220, 38, 38);
     doc.text(copyLabel, innerX + innerW, footY, { align: 'right' });
   }
@@ -610,12 +650,24 @@ export async function downloadSuratJalanPdf(
   });
 
   let fontName = 'helvetica';
+  let hasItalic = false;
+  let hasBoldItalic = false;
   if (calibri) {
     try {
       pdf.addFileToVFS('Calibri.ttf', calibri.regular);
       pdf.addFont('Calibri.ttf', 'Calibri', 'normal');
       pdf.addFileToVFS('Calibri-Bold.ttf', calibri.bold);
       pdf.addFont('Calibri-Bold.ttf', 'Calibri', 'bold');
+      if (calibri.italic) {
+        pdf.addFileToVFS('Calibri-Italic.ttf', calibri.italic);
+        pdf.addFont('Calibri-Italic.ttf', 'Calibri', 'italic');
+        hasItalic = true;
+      }
+      if (calibri.boldItalic) {
+        pdf.addFileToVFS('Calibri-BoldItalic.ttf', calibri.boldItalic);
+        pdf.addFont('Calibri-BoldItalic.ttf', 'Calibri', 'bolditalic');
+        hasBoldItalic = true;
+      }
       fontName = 'Calibri';
     } catch {
       fontName = 'helvetica';
@@ -627,12 +679,14 @@ export async function downloadSuratJalanPdf(
   const usableH = A4_HEIGHT_MM - marginY * 2;
   const halfH = usableH / 2;
   const cardW = A4_WIDTH_MM - marginX * 2;
-  const padGap = 12 * PX_TO_MM;
+  const padGap = 10 * PX_TO_MM;
 
   // Top half: COPY
   drawSuratJalanCopyPdf(
     pdf,
     fontName,
+    hasItalic,
+    hasBoldItalic,
     data,
     sender,
     logo,
@@ -652,6 +706,8 @@ export async function downloadSuratJalanPdf(
   drawSuratJalanCopyPdf(
     pdf,
     fontName,
+    hasItalic,
+    hasBoldItalic,
     data,
     sender,
     logo,

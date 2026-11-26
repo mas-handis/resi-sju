@@ -39,7 +39,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
   const formattedTotalQty = formatIndonesianNumber(totalQty);
   const formattedTotalKoli = formatIndonesianNumber(totalKoli);
 
-  // Ensure at least 2 visible rows for balanced form layout
+  // Ensure at least 2 visible rows for balanced layout
   const displayRows =
     data.rows.length >= 2
       ? data.rows
@@ -58,7 +58,14 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
     ? ['BAGIAN GUDANG', 'ADMINISTRASI', 'PENGIRIM', 'PENERIMA']
     : ['PENERIMA', 'BAGIAN GUDANG', 'PENGIRIM'];
 
-  const compactRows = displayRows.length >= 4;
+  const rowCount = displayRows.length;
+  const isCompact = rowCount >= 4;
+  const isVeryCompact = rowCount >= 6;
+
+  const tableFontSize = isVeryCompact ? '10px' : isCompact ? '11px' : '12.5px';
+  const tableHeaderFontSize = isVeryCompact ? '10px' : '11.5px';
+  const cellPadY = isVeryCompact ? '3px' : isCompact ? '5px' : '10px';
+  const sigBoxHeight = isVeryCompact ? '52px' : isCompact ? '64px' : '88px';
 
   return (
     <div
@@ -72,12 +79,12 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
         flexDirection: 'column',
         justifyContent: 'space-between',
         boxSizing: 'border-box',
-        padding: '2px 4px',
+        padding: '4px 4px 2px',
         overflow: 'hidden',
       }}
     >
-      {/* Top Content Block */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: isSju ? '6px' : '7px' }}>
+      {/* Top & Table Content Block */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: isCompact ? '7px' : '10px' }}>
         {isSju ? (
           <>
             {/* SJU Header: Left = Logo & Company, Right = Kepada/Alamat/No Tlp */}
@@ -86,24 +93,24 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                 display: 'flex',
                 flexDirection: 'row',
                 justifyContent: 'space-between',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 gap: '14px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 52%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 52%' }}>
                 <SuaraMuhammadiyahLogo
                   presetId="sju"
                   logoDataUrl={sender.logoDataUrl}
-                  height={56}
-                  maxWidth={110}
+                  height={62}
+                  maxWidth={128}
                 />
                 <div style={{ minWidth: 0 }}>
                   <div
                     style={{
-                      fontSize: '15px',
+                      fontSize: '18px',
                       fontWeight: 800,
                       color: '#DC2626',
-                      lineHeight: 1.15,
+                      lineHeight: 1.12,
                       letterSpacing: '0.01em',
                     }}
                   >
@@ -111,19 +118,19 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   </div>
                   <div
                     style={{
-                      fontSize: '8.5px',
+                      fontSize: '10px',
                       fontWeight: 700,
                       color: '#4B5563',
                       letterSpacing: '0.06em',
-                      marginBottom: '3px',
+                      marginBottom: '4px',
                     }}
                   >
                     PENERBIT &amp; PERCETAKAN
                   </div>
-                  <div style={{ fontSize: '9px', lineHeight: 1.3, color: '#1F2937' }}>
+                  <div style={{ fontSize: '10.5px', lineHeight: 1.32, color: '#1F2937' }}>
                     <div>{sender.address}</div>
                     {sender.email && <div>Email: {sender.email}</div>}
-                    {sender.phone && <div>Telp. {sender.phone}</div>}
+                    {sender.phone && <div style={{ fontWeight: 700 }}>Telp. {sender.phone}</div>}
                   </div>
                 </div>
               </div>
@@ -131,18 +138,17 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               <div
                 style={{
                   flex: '1 1 46%',
-                  fontSize: '11px',
-                  lineHeight: 1.32,
-                  paddingTop: '2px',
+                  fontSize: '12.5px',
+                  lineHeight: 1.34,
                 }}
               >
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <span style={{ width: '58px', flexShrink: 0, fontWeight: 700 }}>KEPADA</span>
+                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>KEPADA</span>
                   <span style={{ fontWeight: 700 }}>:</span>
-                  <span style={{ fontWeight: 700, flex: 1 }}>{data.kepada || '-'}</span>
+                  <span style={{ fontWeight: 800, flex: 1 }}>{data.kepada || '-'}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
-                  <span style={{ width: '58px', flexShrink: 0, fontWeight: 700 }}>ALAMAT</span>
+                <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>ALAMAT</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span
                     style={{
@@ -154,8 +160,8 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                     {data.alamat || '-'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
-                  <span style={{ width: '58px', flexShrink: 0, fontWeight: 700 }}>NO. TLP</span>
+                <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>NO. TLP</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span style={{ fontWeight: 700, flex: 1 }}>{data.telepon || '-'}</span>
                 </div>
@@ -163,10 +169,10 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
             </div>
 
             {/* SJU Centered Title */}
-            <div style={{ textAlign: 'center', marginTop: '1px', marginBottom: '1px' }}>
+            <div style={{ textAlign: 'center', marginTop: '2px' }}>
               <div
                 style={{
-                  fontSize: '21px',
+                  fontSize: '25px',
                   fontWeight: 900,
                   letterSpacing: '0.04em',
                   lineHeight: 1.05,
@@ -174,7 +180,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               >
                 SURAT JALAN
               </div>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, marginTop: '2px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginTop: '3px' }}>
                 No. {data.nomor || '-'}
                 {data.tanggal ? `   •   Tanggal: ${data.tanggal}` : ''}
                 {data.pengirim ? `   •   Pengirim: ${data.pengirim}` : ''}
@@ -193,17 +199,17 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                 gap: '12px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
                 <SuaraMuhammadiyahLogo
                   presetId="sm"
                   logoDataUrl={sender.logoDataUrl}
-                  height={48}
-                  maxWidth={112}
+                  height={54}
+                  maxWidth={126}
                 />
                 <div style={{ minWidth: 0 }}>
                   <div
                     style={{
-                      fontSize: '15px',
+                      fontSize: '17.5px',
                       fontWeight: 900,
                       lineHeight: 1.15,
                       color: '#000000',
@@ -211,16 +217,16 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   >
                     {sender.title}
                   </div>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#111827', lineHeight: 1.25 }}>
+                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#111827', lineHeight: 1.25 }}>
                     {sender.address}
                   </div>
                   {sender.email && (
-                    <div style={{ fontSize: '9px', color: '#1F2937', lineHeight: 1.25 }}>
+                    <div style={{ fontSize: '10.2px', color: '#1F2937', lineHeight: 1.25 }}>
                       Email: {sender.email}
                     </div>
                   )}
                   {sender.phone && (
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#000000', lineHeight: 1.25 }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#000000', lineHeight: 1.25 }}>
                       Telp. {sender.phone}
                     </div>
                   )}
@@ -229,10 +235,10 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
 
               <div
                 style={{
-                  fontSize: '24px',
+                  fontSize: '27px',
                   fontWeight: 900,
                   letterSpacing: '0.03em',
-                  paddingRight: '10px',
+                  paddingRight: '8px',
                   color: '#000000',
                   flexShrink: 0,
                 }}
@@ -247,27 +253,27 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                 border: '1.5px solid #000000',
                 display: 'flex',
                 flexDirection: 'row',
-                fontSize: '10.5px',
+                fontSize: '12px',
                 lineHeight: 1.32,
               }}
             >
               <div
                 style={{
                   flex: '1 1 56%',
-                  padding: '6px 10px',
+                  padding: '8px 10px',
                   borderRight: '1.5px solid #000000',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '2px',
+                  gap: '3px',
                 }}
               >
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <span style={{ width: '58px', flexShrink: 0, fontWeight: 700 }}>KEPADA</span>
+                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>KEPADA</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span style={{ fontWeight: 800, flex: 1 }}>{data.kepada || '-'}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <span style={{ width: '58px', flexShrink: 0, fontWeight: 700 }}>ALAMAT</span>
+                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>ALAMAT</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span
                     style={{
@@ -280,7 +286,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <span style={{ width: '58px', flexShrink: 0, fontWeight: 700 }}>TELEPON</span>
+                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>TELEPON</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span style={{ fontWeight: 700, flex: 1 }}>{data.telepon || '-'}</span>
                 </div>
@@ -289,25 +295,25 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               <div
                 style={{
                   flex: '1 1 44%',
-                  padding: '6px 12px',
+                  padding: '8px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
-                  gap: '3px',
+                  gap: '4px',
                 }}
               >
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>Nomor</span>
+                  <span style={{ width: '66px', flexShrink: 0, fontWeight: 700 }}>Nomor</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span style={{ fontWeight: 800, flex: 1 }}>{data.nomor || '-'}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>Tanggal</span>
+                  <span style={{ width: '66px', flexShrink: 0, fontWeight: 700 }}>Tanggal</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span style={{ fontWeight: 700, flex: 1 }}>{data.tanggal || '-'}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <span style={{ width: '62px', flexShrink: 0, fontWeight: 700 }}>Pengirim</span>
+                  <span style={{ width: '66px', flexShrink: 0, fontWeight: 700 }}>Pengirim</span>
                   <span style={{ fontWeight: 700 }}>:</span>
                   <span style={{ fontWeight: 700, flex: 1 }}>{data.pengirim || ''}</span>
                 </div>
@@ -322,12 +328,12 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
             width: '100%',
             borderCollapse: 'collapse',
             tableLayout: 'fixed',
-            fontSize: compactRows ? '9.5px' : '10.5px',
+            fontSize: tableFontSize,
           }}
         >
           <colgroup>
-            <col style={{ width: '34px' }} />
-            <col style={{ width: '38%' }} />
+            <col style={{ width: '36px' }} />
+            <col style={{ width: '37%' }} />
             <col style={{ width: '13%' }} />
             <col style={{ width: '18%' }} />
             <col />
@@ -345,10 +351,10 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   key={col}
                   style={{
                     border: '1.25px solid #000000',
-                    padding: '4px 5px',
+                    padding: '6px 5px',
                     textAlign: 'center',
                     fontWeight: 800,
-                    fontSize: '10px',
+                    fontSize: tableHeaderFontSize,
                     letterSpacing: '0.03em',
                   }}
                 >
@@ -369,7 +375,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   <td
                     style={{
                       border: '1px solid #000000',
-                      padding: compactRows ? '2.5px 4px' : '4px 5px',
+                      padding: `${cellPadY} 4px`,
                       textAlign: 'center',
                       fontWeight: 700,
                     }}
@@ -379,7 +385,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   <td
                     style={{
                       border: '1px solid #000000',
-                      padding: compactRows ? '2.5px 6px' : '4px 6px',
+                      padding: `${cellPadY} 8px`,
                       fontWeight: 700,
                       wordBreak: 'break-word',
                     }}
@@ -389,7 +395,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   <td
                     style={{
                       border: '1px solid #000000',
-                      padding: compactRows ? '2.5px 6px' : '4px 6px',
+                      padding: `${cellPadY} 6px`,
                       textAlign: 'center',
                       fontWeight: 700,
                       fontVariantNumeric: 'tabular-nums',
@@ -400,7 +406,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   <td
                     style={{
                       border: '1px solid #000000',
-                      padding: compactRows ? '2.5px 6px' : '4px 6px',
+                      padding: `${cellPadY} 6px`,
                       textAlign: 'center',
                       fontWeight: 800,
                       fontVariantNumeric: 'tabular-nums',
@@ -411,7 +417,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   <td
                     style={{
                       border: '1px solid #000000',
-                      padding: compactRows ? '2.5px 6px' : '4px 6px',
+                      padding: `${cellPadY} 8px`,
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
                       fontWeight: 600,
@@ -429,7 +435,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                 colSpan={2}
                 style={{
                   border: '1.25px solid #000000',
-                  padding: '4px 6px',
+                  padding: '6px 8px',
                   textAlign: 'center',
                   fontWeight: 900,
                   letterSpacing: '0.03em',
@@ -440,7 +446,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               <td
                 style={{
                   border: '1.25px solid #000000',
-                  padding: '4px 6px',
+                  padding: '6px 6px',
                   textAlign: 'center',
                   fontWeight: 900,
                   fontVariantNumeric: 'tabular-nums',
@@ -451,7 +457,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               <td
                 style={{
                   border: '1.25px solid #000000',
-                  padding: '4px 6px',
+                  padding: '6px 6px',
                   textAlign: 'center',
                   fontWeight: 900,
                   fontVariantNumeric: 'tabular-nums',
@@ -464,7 +470,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               <td
                 style={{
                   border: '1.25px solid #000000',
-                  padding: '4px 6px',
+                  padding: '6px 8px',
                   fontWeight: 800,
                   textAlign: 'center',
                 }}
@@ -483,7 +489,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
         {data.catatan.trim() && (
           <div
             style={{
-              fontSize: '9.5px',
+              fontSize: '11px',
               fontStyle: 'italic',
               fontWeight: 600,
               color: isSju ? '#1F2937' : '#DC2626',
@@ -496,9 +502,8 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
       </div>
 
       {/* Bottom Signature & Copy Role Block */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
         {isSju ? (
-          /* SJU: 4 contiguous bordered columns */
           <table
             style={{
               width: '100%',
@@ -519,9 +524,9 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                     key={col}
                     style={{
                       border: '1.25px solid #000000',
-                      padding: '4px 4px',
+                      padding: '5px 4px',
                       textAlign: 'center',
-                      fontSize: '10px',
+                      fontSize: '11.5px',
                       fontWeight: 800,
                     }}
                   >
@@ -537,11 +542,11 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                     key={col}
                     style={{
                       border: '1.25px solid #000000',
-                      height: '62px',
+                      height: sigBoxHeight,
                       verticalAlign: 'bottom',
                       textAlign: 'center',
-                      padding: '4px 6px',
-                      fontSize: '10px',
+                      padding: '6px',
+                      fontSize: '11.5px',
                       fontWeight: 600,
                     }}
                   >
@@ -552,7 +557,6 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
             </tbody>
           </table>
         ) : (
-          /* SM: 2 signature groups matching SM reference (PENERIMA on left, BAGIAN GUDANG + PENGIRIM on right) */
           <div style={{ display: 'flex', gap: '14px' }}>
             <div style={{ flex: '1 1 36%', border: '1.25px solid #000000' }}>
               <div
@@ -561,9 +565,9 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                   WebkitPrintColorAdjust: 'exact',
                   printColorAdjust: 'exact',
                   borderBottom: '1.25px solid #000000',
-                  padding: '3.5px 6px',
+                  padding: '5px 6px',
                   textAlign: 'center',
-                  fontSize: '10px',
+                  fontSize: '11.5px',
                   fontWeight: 800,
                 }}
               >
@@ -571,12 +575,12 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               </div>
               <div
                 style={{
-                  height: '58px',
+                  height: sigBoxHeight,
                   display: 'flex',
                   alignItems: 'flex-end',
                   justifyContent: 'center',
-                  paddingBottom: '5px',
-                  fontSize: '10px',
+                  paddingBottom: '6px',
+                  fontSize: '11.5px',
                   fontWeight: 600,
                 }}
               >
@@ -604,9 +608,9 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               >
                 <div
                   style={{
-                    padding: '3.5px 6px',
+                    padding: '5px 6px',
                     textAlign: 'center',
-                    fontSize: '10px',
+                    fontSize: '11.5px',
                     fontWeight: 800,
                     borderRight: '1px solid #000000',
                   }}
@@ -615,9 +619,9 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                 </div>
                 <div
                   style={{
-                    padding: '3.5px 6px',
+                    padding: '5px 6px',
                     textAlign: 'center',
-                    fontSize: '10px',
+                    fontSize: '11.5px',
                     fontWeight: 800,
                   }}
                 >
@@ -626,7 +630,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
               </div>
               <div
                 style={{
-                  height: '58px',
+                  height: sigBoxHeight,
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
                 }}
@@ -636,8 +640,8 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                     display: 'flex',
                     alignItems: 'flex-end',
                     justifyContent: 'center',
-                    paddingBottom: '5px',
-                    fontSize: '10px',
+                    paddingBottom: '6px',
+                    fontSize: '11.5px',
                     fontWeight: 600,
                     borderRight: '1px solid #000000',
                   }}
@@ -649,8 +653,8 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
                     display: 'flex',
                     alignItems: 'flex-end',
                     justifyContent: 'center',
-                    paddingBottom: '5px',
-                    fontSize: '10px',
+                    paddingBottom: '6px',
+                    fontSize: '11.5px',
                     fontWeight: 600,
                   }}
                 >
@@ -661,7 +665,7 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
           </div>
         )}
 
-        {/* Footnote + Copy Indicator */}
+        {/* Footnote & Copy Indicator */}
         <div
           style={{
             display: 'flex',
@@ -670,13 +674,13 @@ export const SuratJalanCardPrint: React.FC<SuratJalanCardPrintProps> = ({
             gap: '8px',
           }}
         >
-          <div style={{ fontSize: '9px', fontStyle: 'italic', color: '#1F2937' }}>
+          <div style={{ fontSize: '10.5px', fontStyle: 'italic', color: '#1F2937' }}>
             {data.footnote}
           </div>
           {data.showCopyLabels && (
             <div
               style={{
-                fontSize: '9.5px',
+                fontSize: '11px',
                 fontWeight: 800,
                 fontStyle: 'italic',
                 color: '#DC2626',

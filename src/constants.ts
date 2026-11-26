@@ -343,7 +343,7 @@ export function createSampleSuratJalan(presetId: SenderPresetId): SuratJalanData
     pengirim: '',
     kepada: 'BU INA LAUNDRY',
     alamat:
-      'JL. INSPEKSI KANAL SELATAN II NO 80 KEL. BONTOLEBANG\nKOTA MAKASAR PROV. SULAWESI SELASAN',
+      'JL. INSPEKSI KANAL SELATAN II NO 80 KEL. BONTOLEBANG\nKOTA MAKASAR PROV. SULAWESI SELATAN',
     telepon: '0813-5513-1385',
     rows: [
       {

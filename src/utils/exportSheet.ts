@@ -40,6 +40,8 @@ export const CAP_HEIGHT_RATIO = 0.64; // Calibri cap height ratio
 export interface CalibriFontPair {
   regular: string;
   bold: string;
+  italic?: string;
+  boldItalic?: string;
 }
 
 let cachedCalibriFonts: CalibriFontPair | null = null;
@@ -68,20 +70,28 @@ export async function loadCalibriFonts(): Promise<CalibriFontPair | null> {
   if (typeof fetch !== 'function') return null;
 
   try {
-    const [regRes, boldRes] = await Promise.all([
+    const [regRes, boldRes, italicRes, boldItalicRes] = await Promise.all([
       fetch('/fonts/Calibri.ttf'),
       fetch('/fonts/Calibri-Bold.ttf'),
+      fetch('/fonts/Calibri-Italic.ttf').catch(() => null),
+      fetch('/fonts/Calibri-BoldItalic.ttf').catch(() => null),
     ]);
     if (!regRes.ok || !boldRes.ok) return null;
 
-    const [regBuf, boldBuf] = await Promise.all([
+    const [regBuf, boldBuf, italicBuf, boldItalicBuf] = await Promise.all([
       regRes.arrayBuffer(),
       boldRes.arrayBuffer(),
+      italicRes && italicRes.ok ? italicRes.arrayBuffer() : Promise.resolve(null),
+      boldItalicRes && boldItalicRes.ok
+        ? boldItalicRes.arrayBuffer()
+        : Promise.resolve(null),
     ]);
 
     cachedCalibriFonts = {
       regular: arrayBufferToBase64(regBuf),
       bold: arrayBufferToBase64(boldBuf),
+      italic: italicBuf ? arrayBufferToBase64(italicBuf) : undefined,
+      boldItalic: boldItalicBuf ? arrayBufferToBase64(boldItalicBuf) : undefined,
     };
     return cachedCalibriFonts;
   } catch {
