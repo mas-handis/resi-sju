@@ -226,9 +226,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       el.style.fontSize = `${Math.floor(best * 10) / 10}px`;
     };
 
-    fitLineToWidth(kopTitleRef.current, 12, 24);
-    fitLineToWidth(kopAddrRef.current, 10, 16.5);
-    fitLineToWidth(kopContactRef.current, 9, 13.5);
+    fitLineToWidth(kopTitleRef.current, 12, 25);
+    fitLineToWidth(kopAddrRef.current, 10, 17.5);
+    fitLineToWidth(kopContactRef.current, 9, 14);
   }, [sender.title, sender.address, sender.phone, sender.email, sender.presetId, sender.logoDataUrl]);
 
   const hasContactLine = Boolean(sender.phone || sender.email);
@@ -243,7 +243,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
-        fontFamily: 'Arial, Helvetica, "Inter", sans-serif',
+        fontFamily: 'Calibri, "Carlito", Arial, Helvetica, sans-serif',
         color: '#000000',
         overflow: 'hidden',
       }}

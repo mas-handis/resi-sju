@@ -35,7 +35,59 @@ function getFilePrefix(presetId: SenderPresetId): string {
 const PX_TO_MM = A4_WIDTH_MM / A4_PX_WIDTH; // ~0.26448 mm/px
 const PX_TO_PT = 0.75; // 1 CSS px = 0.75 pt
 const PT_TO_MM = 25.4 / 72; // ~0.35278 mm/pt
-const CAP_HEIGHT_RATIO = 0.718; // Standard Helvetica cap height ratio
+const CAP_HEIGHT_RATIO = 0.64; // Calibri cap height ratio
+
+interface CalibriFontPair {
+  regular: string;
+  bold: string;
+}
+
+let cachedCalibriFonts: CalibriFontPair | null = null;
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+async function loadCalibriFonts(): Promise<CalibriFontPair | null> {
+  if (cachedCalibriFonts) return cachedCalibriFonts;
+
+  const injected = (globalThis as unknown as { __CALIBRI_FONTS?: CalibriFontPair })
+    .__CALIBRI_FONTS;
+  if (injected) {
+    cachedCalibriFonts = injected;
+    return injected;
+  }
+
+  if (typeof fetch !== 'function') return null;
+
+  try {
+    const [regRes, boldRes] = await Promise.all([
+      fetch('/fonts/Calibri.ttf'),
+      fetch('/fonts/Calibri-Bold.ttf'),
+    ]);
+    if (!regRes.ok || !boldRes.ok) return null;
+
+    const [regBuf, boldBuf] = await Promise.all([
+      regRes.arrayBuffer(),
+      boldRes.arrayBuffer(),
+    ]);
+
+    cachedCalibriFonts = {
+      regular: arrayBufferToBase64(regBuf),
+      bold: arrayBufferToBase64(boldBuf),
+    };
+    return cachedCalibriFonts;
+  } catch {
+    return null;
+  }
+}
 
 interface ResolvedLogo {
   dataUrl: string;
@@ -63,20 +115,23 @@ async function resolveLogoForPdf(sender: SenderHeader): Promise<ResolvedLogo> {
   return new Promise<ResolvedLogo>((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const ratio = img.naturalWidth > 0 && img.naturalHeight > 0
-        ? img.naturalWidth / img.naturalHeight
-        : 2;
+      const ratio =
+        img.naturalWidth > 0 && img.naturalHeight > 0
+          ? img.naturalWidth / img.naturalHeight
+          : 2;
 
       if (customUrl.startsWith('data:image/png')) {
         resolve({ dataUrl: customUrl, format: 'PNG', aspectRatio: ratio });
         return;
       }
-      if (customUrl.startsWith('data:image/jpeg') || customUrl.startsWith('data:image/jpg')) {
+      if (
+        customUrl.startsWith('data:image/jpeg') ||
+        customUrl.startsWith('data:image/jpg')
+      ) {
         resolve({ dataUrl: customUrl, format: 'JPEG', aspectRatio: ratio });
         return;
       }
 
-      // Convert SVG / WebP / other image types to PNG once
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(img.naturalWidth || 300, 1);
       canvas.height = Math.max(img.naturalHeight || 150, 1);
@@ -100,10 +155,10 @@ async function resolveLogoForPdf(sender: SenderHeader): Promise<ResolvedLogo> {
 function getCodeFontPx(value: string, rowCount = 1): number {
   const len = value.trim().length;
   const scale = rowCount >= 3 ? 0.84 : rowCount === 2 ? 0.92 : 1;
-  let base = 17;
-  if (len <= 3) base = 38;
-  else if (len <= 5) base = 30;
-  else if (len <= 7) base = 22;
+  let base = 18;
+  if (len <= 3) base = 40;
+  else if (len <= 5) base = 32;
+  else if (len <= 7) base = 24;
   return Math.round(base * scale);
 }
 
@@ -126,6 +181,7 @@ function sanitizePdfText(input: string): string {
 
 function fitSingleLinePt(
   doc: jsPDF,
+  fontName: string,
   text: string,
   fontStyle: 'bold' | 'normal',
   maxWidthMm: number,
@@ -133,7 +189,7 @@ function fitSingleLinePt(
   maxPt: number
 ): number {
   if (!text) return maxPt;
-  doc.setFont('helvetica', fontStyle);
+  doc.setFont(fontName, fontStyle);
   let low = minPt;
   let high = maxPt;
   let best = minPt;
@@ -178,20 +234,17 @@ function drawCutLine(doc: jsPDF, cardX: number, cardW: number, cutY: number): vo
   const leftEdge = cardX - overhangMm;
   const rightEdge = cardX + cardW + overhangMm;
 
-  // Left and right solid crop ticks
   doc.setDrawColor(100, 116, 139); // #64748B
   doc.setLineWidth(0.4);
   doc.line(leftEdge, cutY, leftEdge + tickLenMm, cutY);
   doc.line(rightEdge - tickLenMm, cutY, rightEdge, cutY);
 
-  // Tiny crisp vector scissor icon
   const sx = leftEdge + tickLenMm + 1.1;
   doc.circle(sx, cutY - 0.55, 0.42, 'S');
   doc.circle(sx, cutY + 0.55, 0.42, 'S');
   doc.line(sx + 0.38, cutY - 0.35, sx + 2.3, cutY + 0.55);
   doc.line(sx + 0.38, cutY + 0.35, sx + 2.3, cutY - 0.55);
 
-  // Main dashed line across
   doc.setDrawColor(148, 163, 184); // #94A3B8
   doc.setLineDashPattern([1.6, 1.3], 0);
   doc.line(sx + 3.0, cutY, rightEdge - tickLenMm - 1.0, cutY);
@@ -200,6 +253,7 @@ function drawCutLine(doc: jsPDF, cardX: number, cardW: number, cutY: number): vo
 
 function drawResiCardPdf(
   doc: jsPDF,
+  fontName: string,
   item: ResiItem,
   sender: SenderHeader,
   logo: ResolvedLogo,
@@ -261,18 +315,18 @@ function drawResiCardPdf(
       .join(' | ')
   );
 
-  const titlePt = fitSingleLinePt(doc, kopTitle, 'bold', kopTextMaxW, 9, 18.5);
-  const addrPt = fitSingleLinePt(doc, kopAddr, 'bold', kopTextMaxW, 7.5, 13);
+  const titlePt = fitSingleLinePt(doc, fontName, kopTitle, 'bold', kopTextMaxW, 9.5, 19.5);
+  const addrPt = fitSingleLinePt(doc, fontName, kopAddr, 'bold', kopTextMaxW, 8, 13.5);
   const contactPt = kopContact
-    ? fitSingleLinePt(doc, kopContact, 'normal', kopTextMaxW, 6.75, 10.5)
+    ? fitSingleLinePt(doc, fontName, kopContact, 'normal', kopTextMaxW, 7, 10.75)
     : 0;
 
-  const titleLineH = titlePt * PT_TO_MM * 1.18;
-  const addrLineH = addrPt * PT_TO_MM * 1.22;
-  const contactLineH = contactPt ? contactPt * PT_TO_MM * 1.22 : 0;
+  const titleLineH = titlePt * PT_TO_MM * 1.16;
+  const addrLineH = addrPt * PT_TO_MM * 1.2;
+  const contactLineH = contactPt ? contactPt * PT_TO_MM * 1.2 : 0;
   const kopTextBlockH =
     titlePt * PT_TO_MM * CAP_HEIGHT_RATIO +
-    (addrPt ? titleLineH * 0.18 + addrLineH : 0) +
+    (addrPt ? titleLineH * 0.16 + addrLineH : 0) +
     (contactLineH ? contactLineH : 0);
 
   const kopRowH = Math.max(logoH + kopPadY * 2, kopTextBlockH + kopPadY * 2, 16.5);
@@ -280,12 +334,10 @@ function drawResiCardPdf(
 
   // 4. Gray Label Backgrounds (#F3F4F6)
   doc.setFillColor(243, 244, 246);
-  // Left DARI & KEPADA column
   doc.rect(x, y, leftLabelW, upperH, 'F');
-  // Right KOLI KE & DARI header strips
   const rightX = x + leftW;
   const rightHalfH = upperH / 2;
-  const cornerHeaderH = 22 * PX_TO_MM; // ~5.82 mm
+  const cornerHeaderH = 22 * PX_TO_MM;
   doc.rect(rightX, y, rightColW, cornerHeaderH, 'F');
   doc.rect(rightX, y + rightHalfH, rightColW, cornerHeaderH, 'F');
 
@@ -306,44 +358,43 @@ function drawResiCardPdf(
   }
 
   const divX = kopCellX + kopPadX + logoW + gapMm;
-  doc.setDrawColor(209, 213, 219); // #D1D5DB
+  doc.setDrawColor(209, 213, 219);
   doc.setLineWidth(0.4);
   doc.line(divX, y + kopPadY, divX, y + kopRowH - kopPadY);
 
-  // Vertically center the 2 or 3 Kop text lines cleanly
   const titleCapMm = titlePt * PT_TO_MM * CAP_HEIGHT_RATIO;
-  const addrStepMm = addrPt * PT_TO_MM * 1.25;
-  const contactStepMm = contactPt ? contactPt * PT_TO_MM * 1.25 : 0;
+  const addrStepMm = addrPt * PT_TO_MM * 1.24;
+  const contactStepMm = contactPt ? contactPt * PT_TO_MM * 1.24 : 0;
   const kopSpanMm = titleCapMm + addrStepMm + contactStepMm;
   const kopStartBaseY = y + (kopRowH - kopSpanMm) / 2 + titleCapMm;
 
   doc.setTextColor(0, 0, 0);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(fontName, 'bold');
   doc.setFontSize(titlePt);
   doc.text(kopTitle, kopTextX, kopStartBaseY);
 
   doc.setTextColor(17, 24, 39);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(fontName, 'bold');
   doc.setFontSize(addrPt);
   doc.text(kopAddr, kopTextX, kopStartBaseY + addrStepMm);
 
   if (kopContact && contactPt > 0) {
     doc.setTextColor(55, 65, 81);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(fontName, 'normal');
     doc.setFontSize(contactPt);
     doc.text(kopContact, kopTextX, kopStartBaseY + addrStepMm + contactStepMm);
   }
 
   // 6. Left Labels: DARI & KEPADA (Centered X & Y)
   doc.setTextColor(17, 24, 39);
-  doc.setFont('helvetica', 'bold');
-  drawCenteredLines(doc, ['DARI'], x + leftLabelW / 2, y + kopRowH / 2, 12 * PX_TO_PT, 1.15);
+  doc.setFont(fontName, 'bold');
+  drawCenteredLines(doc, ['DARI'], x + leftLabelW / 2, y + kopRowH / 2, 12.5 * PX_TO_PT, 1.15);
   drawCenteredLines(
     doc,
     ['KEPADA'],
     x + leftLabelW / 2,
     y + kopRowH + kepadaRowH / 2,
-    12 * PX_TO_PT,
+    12.5 * PX_TO_PT,
     1.15
   );
 
@@ -366,30 +417,30 @@ function drawResiCardPdf(
 
     const layoutKepada = (basePx: number) => {
       const basePt = basePx * PX_TO_PT;
-      const firstPt = Math.round(basePx * 1.12) * PX_TO_PT;
+      const firstPt = Math.round(basePx * 1.14) * PX_TO_PT;
       const gapSmallMm = Math.max(2, Math.round(basePx * 0.14)) * PX_TO_MM;
       const gapPhoneMm = Math.max(3, Math.round(basePx * 0.2)) * PX_TO_MM;
 
-      const firstStep = firstPt * PT_TO_MM * 1.22;
-      const baseStep = basePt * PT_TO_MM * 1.24;
+      const firstStep = firstPt * PT_TO_MM * 1.2;
+      const baseStep = basePt * PT_TO_MM * 1.22;
 
       let firstWrapped: string[] = [];
       if (hasKepada && firstLine) {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(fontName, 'bold');
         doc.setFontSize(firstPt);
         firstWrapped = doc.splitTextToSize(firstLine, kAvailW);
       }
 
       let restWrapped: string[] = [];
       if (hasKepada && restText) {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(fontName, 'bold');
         doc.setFontSize(basePt);
         restWrapped = doc.splitTextToSize(restText, kAvailW);
       }
 
       let phoneWrapped: string[] = [];
       if (phoneDisplay) {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(fontName, 'bold');
         doc.setFontSize(basePt);
         phoneWrapped = doc.splitTextToSize(phoneDisplay, kAvailW);
       }
@@ -420,7 +471,7 @@ function drawResiCardPdf(
     };
 
     let lowPx = 10;
-    let highPx = 32;
+    let highPx = 34;
     let bestPx = 10;
     while (lowPx <= highPx) {
       const midPx = Math.floor((lowPx + highPx) / 2);
@@ -439,7 +490,7 @@ function drawResiCardPdf(
 
     if (best.firstWrapped.length > 0) {
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       doc.setFontSize(best.firstPt);
       const capMm = best.firstPt * PT_TO_MM * CAP_HEIGHT_RATIO;
       best.firstWrapped.forEach((line, idx) => {
@@ -451,7 +502,7 @@ function drawResiCardPdf(
     if (best.restWrapped.length > 0) {
       if (best.firstWrapped.length > 0) curY += best.gapSmallMm;
       doc.setTextColor(17, 24, 39);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       doc.setFontSize(best.basePt);
       const capMm = best.basePt * PT_TO_MM * CAP_HEIGHT_RATIO;
       best.restWrapped.forEach((line, idx) => {
@@ -463,7 +514,7 @@ function drawResiCardPdf(
     if (best.phoneWrapped.length > 0) {
       if (hasKepada) curY += best.gapPhoneMm;
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       doc.setFontSize(best.basePt);
       const capMm = best.basePt * PT_TO_MM * CAP_HEIGHT_RATIO;
       best.phoneWrapped.forEach((line, idx) => {
@@ -475,14 +526,14 @@ function drawResiCardPdf(
   // 8. Right Corner Headers: KOLI KE & DARI (Centered X & Y)
   const rightCenterX = rightX + rightColW / 2;
   doc.setTextColor(0, 0, 0);
-  doc.setFont('helvetica', 'bold');
-  drawCenteredLines(doc, ['KOLI KE'], rightCenterX, y + cornerHeaderH / 2, 10.5 * PX_TO_PT, 1.15);
+  doc.setFont(fontName, 'bold');
+  drawCenteredLines(doc, ['KOLI KE'], rightCenterX, y + cornerHeaderH / 2, 11 * PX_TO_PT, 1.15);
   drawCenteredLines(
     doc,
     ['DARI'],
     rightCenterX,
     y + rightHalfH + cornerHeaderH / 2,
-    10.5 * PX_TO_PT,
+    11 * PX_TO_PT,
     1.15
   );
 
@@ -491,9 +542,17 @@ function drawResiCardPdf(
   if (koliKeTrimmed) {
     const valCenterY = y + cornerHeaderH + (rightHalfH - cornerHeaderH) / 2;
     const maxPt = getCodeFontPx(koliKeTrimmed, rowCount) * PX_TO_PT;
-    const fittedPt = fitSingleLinePt(doc, koliKeTrimmed, 'bold', rightColW - 4, 10, maxPt);
+    const fittedPt = fitSingleLinePt(
+      doc,
+      fontName,
+      koliKeTrimmed,
+      'bold',
+      rightColW - 4,
+      10,
+      maxPt
+    );
     doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(fontName, 'bold');
     drawCenteredLines(doc, [koliKeTrimmed], rightCenterX, valCenterY, fittedPt, 1.05);
   }
 
@@ -505,41 +564,49 @@ function drawResiCardPdf(
     if (koliMatch) {
       const numStr = koliMatch[1];
       const maxNumPt = getCodeFontPx(numStr, rowCount) * PX_TO_PT;
-      const numPt = fitSingleLinePt(doc, numStr, 'bold', rightColW - 4, 10, maxNumPt);
-      const koliPt = (rowCount >= 3 ? 9 : 10) * PX_TO_PT;
+      const numPt = fitSingleLinePt(doc, fontName, numStr, 'bold', rightColW - 4, 10, maxNumPt);
+      const koliPt = (rowCount >= 3 ? 9.5 : 10.5) * PX_TO_PT;
 
       const numCapMm = numPt * PT_TO_MM * CAP_HEIGHT_RATIO;
       const koliCapMm = koliPt * PT_TO_MM * CAP_HEIGHT_RATIO;
-      const stackGapMm = rowCount >= 3 ? 1.1 : 1.4;
+      const stackGapMm = rowCount >= 3 ? 1.15 : 1.45;
       const totalStackMm = numCapMm + stackGapMm + koliCapMm;
       const stackTopY = dariCenterY - totalStackMm / 2;
 
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       doc.setFontSize(numPt);
       doc.text(numStr, rightCenterX, stackTopY + numCapMm, { align: 'center' });
 
       doc.setTextColor(31, 41, 55);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       doc.setFontSize(koliPt);
       doc.text('KOLI', rightCenterX, stackTopY + numCapMm + stackGapMm + koliCapMm, {
         align: 'center',
       });
     } else {
       const maxPt = getCodeFontPx(dariTrimmed, rowCount) * PX_TO_PT;
-      const fittedPt = fitSingleLinePt(doc, dariTrimmed, 'bold', rightColW - 4, 9, maxPt);
+      const fittedPt = fitSingleLinePt(
+        doc,
+        fontName,
+        dariTrimmed,
+        'bold',
+        rightColW - 4,
+        9,
+        maxPt
+      );
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       drawCenteredLines(doc, [dariTrimmed], rightCenterX, dariCenterY, fittedPt, 1.05);
     }
   }
 
   // 11 & 12. Bottom 1–3 Color-Coded Rows (Pesanan + QTY)
-  const barangMaxPx = rowCount >= 3 ? 15 : rowCount === 2 ? 18 : 24;
-  const barangMinPx = rowCount >= 3 ? 8.5 : 10;
-  const qtyLabelPx = rowCount >= 3 ? 7.5 : rowCount === 2 ? 8 : 9;
-  const qtyMaxPx = rowCount >= 3 ? 13 : rowCount === 2 ? 16 : 22;
-  const qtyMinPx = rowCount >= 3 ? 8.5 : 8.25;
+  const barangMaxPx = rowCount >= 3 ? 16 : rowCount === 2 ? 19 : 25;
+  const barangMinPx = rowCount >= 3 ? 9 : 10.5;
+  const qtyLabelPx = rowCount >= 3 ? 8 : rowCount === 2 ? 8.5 : 9.5;
+  const qtyMaxPx = rowCount >= 3 ? 14 : rowCount === 2 ? 17 : 23;
+  const qtyMinPx = rowCount >= 3 ? 9 : 9;
 
   bottomRows.forEach((row, idx) => {
     const rowY = bottomY + idx * rowHeightMm;
@@ -552,7 +619,7 @@ function drawResiCardPdf(
       const bAvailW = leftW - bPadX * 2;
       const bAvailH = rowHeightMm - bPadY * 2;
 
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       let bestPt = barangMinPx * PX_TO_PT;
       let bestLines: string[] = [barangText];
       for (let px = barangMaxPx; px >= barangMinPx; px -= 0.5) {
@@ -570,7 +637,7 @@ function drawResiCardPdf(
       }
 
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       drawCenteredLines(doc, bestLines, x + leftW / 2, rowCenterY, bestPt, 1.15);
     }
 
@@ -582,6 +649,7 @@ function drawResiCardPdf(
       const qAvailW = rightColW - 16 * PX_TO_MM;
       const qtyValPt = fitSingleLinePt(
         doc,
+        fontName,
         qtyText,
         'bold',
         qAvailW,
@@ -594,7 +662,7 @@ function drawResiCardPdf(
       const stackTopY = rowCenterY - totalStackMm / 2;
 
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       doc.setFontSize(qtyLabelPt);
       doc.text('QTY', rightCenterX, stackTopY + qtyLabelCapMm, { align: 'center' });
 
@@ -604,19 +672,22 @@ function drawResiCardPdf(
       });
     } else {
       doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'bold');
       drawCenteredLines(doc, ['QTY'], rightCenterX, rowCenterY, qtyLabelPt, 1.1);
     }
   });
 
   // 13. Crisp Vector Borders (drawn last so lines are clean over background fills)
   doc.setDrawColor(0, 0, 0);
-  // Thin internal 1px dividers
   doc.setLineWidth(1 * PX_TO_MM);
   doc.line(rightX, y + cornerHeaderH, rightX + rightColW, y + cornerHeaderH);
-  doc.line(rightX, y + rightHalfH + cornerHeaderH, rightX + rightColW, y + rightHalfH + cornerHeaderH);
+  doc.line(
+    rightX,
+    y + rightHalfH + cornerHeaderH,
+    rightX + rightColW,
+    y + rightHalfH + cornerHeaderH
+  );
 
-  // Medium 1.5px structural dividers
   doc.setLineWidth(1.5 * PX_TO_MM);
   doc.line(x + leftLabelW, y, x + leftLabelW, y + upperH);
   doc.line(x, y + kopRowH, x + leftW, y + kopRowH);
@@ -626,7 +697,6 @@ function drawResiCardPdf(
     doc.line(x, lineY, x + w, lineY);
   }
 
-  // Heavy 2px outer & vertical corner dividers
   doc.setLineWidth(2 * PX_TO_MM);
   doc.line(rightX, y, rightX, y + h);
   doc.rect(x, y, w, h, 'S');
@@ -638,7 +708,10 @@ export async function downloadA4Pdf(
   showCutLines: boolean
 ): Promise<string> {
   const pages = paginateResiList(resiList);
-  const logo = await resolveLogoForPdf(sender);
+  const [logo, calibri] = await Promise.all([
+    resolveLogoForPdf(sender),
+    loadCalibriFonts(),
+  ]);
   const filename = `${getFilePrefix(sender.presetId)}-${buildTimestamp()}.pdf`;
 
   const pdf = new jsPDF({
@@ -647,6 +720,19 @@ export async function downloadA4Pdf(
     format: 'a4',
     compress: true,
   });
+
+  let fontName = 'helvetica';
+  if (calibri) {
+    try {
+      pdf.addFileToVFS('Calibri.ttf', calibri.regular);
+      pdf.addFont('Calibri.ttf', 'Calibri', 'normal');
+      pdf.addFileToVFS('Calibri-Bold.ttf', calibri.bold);
+      pdf.addFont('Calibri-Bold.ttf', 'Calibri', 'bold');
+      fontName = 'Calibri';
+    } catch {
+      fontName = 'helvetica';
+    }
+  }
 
   const marginX = 28 * PX_TO_MM;
   const marginY = 22 * PX_TO_MM;
@@ -671,7 +757,7 @@ export async function downloadA4Pdf(
       const cardY = slotY + padTop;
       const cardH = slotH - padTop - padBottom;
 
-      drawResiCardPdf(pdf, item, sender, logo, marginX, cardY, cardW, cardH);
+      drawResiCardPdf(pdf, fontName, item, sender, logo, marginX, cardY, cardW, cardH);
 
       if (showCutLines && !isLastSlot) {
         drawCutLine(pdf, marginX, cardW, slotY + slotH);
