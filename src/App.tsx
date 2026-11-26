@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
   ClipboardList,
@@ -7,11 +7,13 @@ import {
   FileSpreadsheet,
   FileText,
   Loader2,
+  Moon,
   Package,
   Plus,
   Printer,
   RotateCcw,
   Sparkles,
+  Sun,
   Trash2,
 } from 'lucide-react';
 import { A3Sheet } from './components/A3Sheet';
@@ -54,8 +56,24 @@ export function App() {
   const [showCutLines, setShowCutLines] = useState<boolean>(true);
   const [activeResiId, setActiveResiId] = useState<string | null>(() => resiList[0]?.id ?? null);
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
+    try {
+      return localStorage.getItem('resi_ui_theme') === 'light' ? 'light' : 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
   const [exportingType, setExportingType] = useState<'pdf' | 'excel' | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', themeMode === 'dark');
+    try {
+      localStorage.setItem('resi_ui_theme', themeMode);
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [themeMode]);
 
   const exportRef = useRef<HTMLDivElement | null>(null);
   const koliRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -281,11 +299,21 @@ export function App() {
 
   return (
     <>
-      <div className="no-print min-h-screen lg:h-screen flex flex-col bg-slate-100 text-slate-900">
-        {/* Top Application Header (Colorful & Clear Action Hierarchy) */}
-        <header className="sticky top-0 z-30 bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white shadow-md px-4 lg:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+      <div className="no-print relative min-h-screen lg:h-screen flex flex-col bg-[#F3F8F5] dark:bg-[#08130F] text-slate-900 dark:text-slate-100 overflow-x-hidden transition-colors">
+        {/* Ambient Green & Orange Glows for Glassmorphism */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 overflow-hidden z-0"
+        >
+          <div className="absolute -top-28 -left-24 h-96 w-96 rounded-full bg-emerald-400/30 dark:bg-emerald-500/25 blur-[110px]" />
+          <div className="absolute top-1/3 left-1/3 h-80 w-80 rounded-full bg-orange-300/25 dark:bg-orange-500/15 blur-[120px]" />
+          <div className="absolute -bottom-28 -right-20 h-96 w-96 rounded-full bg-orange-400/30 dark:bg-orange-500/25 blur-[115px]" />
+        </div>
+
+        {/* Top Application Header — Glassmorphism (Light & Dark, Hijau & Oranye) */}
+        <header className="sticky top-0 z-30 bg-white/75 dark:bg-[#0D1E18]/75 backdrop-blur-xl border-b border-emerald-200/80 dark:border-white/15 text-slate-900 dark:text-white shadow-[0_8px_32px_rgba(11,110,79,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] px-4 lg:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-orange-500 text-white flex items-center justify-center flex-shrink-0 shadow-[0_4px_14px_rgba(249,115,22,0.35)]">
               {appMode === 'surat_jalan' ? (
                 <ClipboardList className="w-4 h-4 stroke-[2.5]" />
               ) : (
@@ -293,20 +321,18 @@ export function App() {
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-extrabold text-white leading-tight truncate tracking-wide">
+              <h1 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white leading-tight truncate tracking-wide">
                 {appMode === 'surat_jalan' ? 'SURAT JALAN GENERATOR' : 'RESI GENERATOR'}
               </h1>
-              <p className="text-[11px] sm:text-xs text-emerald-100 truncate">
-                {appMode === 'surat_jalan'
-                  ? `${senderLabel} • 2 Rangkap / Hal. A4 (Copy & Asli)`
-                  : `${senderLabel} • ${resiList.length} resi (${pages.length} hal. A4)`}
+              <p className="text-[11px] sm:text-xs text-emerald-700 dark:text-emerald-300/90 truncate font-semibold">
+                {senderLabel}
               </p>
             </div>
           </div>
 
-          {/* Mode Switcher: Resi Pengiriman vs Surat Jalan */}
+          {/* Mode Switcher: Resi vs Surat Jalan */}
           <div
-            className="order-3 sm:order-2 w-full sm:w-auto flex items-center rounded-xl bg-emerald-950/45 p-1 border border-white/15"
+            className="order-3 sm:order-2 w-full sm:w-auto flex items-center rounded-full bg-emerald-100/80 dark:bg-white/[0.07] backdrop-blur-md p-1 border border-emerald-200/80 dark:border-white/15"
             role="tablist"
             aria-label="Pilih Jenis Dokumen"
           >
@@ -315,47 +341,68 @@ export function App() {
               role="tab"
               aria-selected={appMode === 'resi'}
               onClick={() => setAppMode('resi')}
-              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 appMode === 'resi'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-emerald-100 hover:text-white hover:bg-white/10'
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-[0_4px_14px_rgba(249,115,22,0.4)]'
+                  : 'text-emerald-900 dark:text-slate-300 hover:bg-white/60 dark:hover:text-white dark:hover:bg-white/10'
               }`}
             >
               <Package className="w-3.5 h-3.5" />
-              Resi (4/Hal)
+              Resi
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={appMode === 'surat_jalan'}
               onClick={() => setAppMode('surat_jalan')}
-              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
                 appMode === 'surat_jalan'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-emerald-100 hover:text-white hover:bg-white/10'
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-[0_4px_14px_rgba(249,115,22,0.4)]'
+                  : 'text-emerald-900 dark:text-slate-300 hover:bg-white/60 dark:hover:text-white dark:hover:bg-white/10'
               }`}
             >
               <ClipboardList className="w-3.5 h-3.5" />
-              Surat Jalan (2/Hal)
+              Surat Jalan
             </button>
           </div>
 
           {/* Desktop & Tablet Actions */}
           <div className="order-2 sm:order-3 flex items-center gap-2">
+            {/* Theme Toggle (Gelap / Terang) */}
+            <button
+              type="button"
+              onClick={() => setThemeMode((t) => (t === 'dark' ? 'light' : 'dark'))}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-2.5 py-2 text-xs font-bold text-emerald-900 dark:text-amber-200 hover:bg-white dark:hover:bg-white/20 transition-colors shadow-xs"
+              title={themeMode === 'dark' ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'}
+              aria-label="Ganti tema gelap atau terang"
+            >
+              {themeMode === 'dark' ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="hidden 2xl:inline">Terang</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-emerald-700" />
+                  <span className="hidden 2xl:inline">Gelap</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={handleLoadSample}
-              className="hidden md:inline-flex items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-amber-300 shadow-sm transition-colors"
-              title="Isi formulir dengan contoh data resi"
+              className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-orange-300 dark:border-orange-400/40 bg-orange-100/90 dark:bg-orange-500/20 backdrop-blur-md px-3.5 py-2 text-xs font-bold text-orange-900 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-500/35 dark:hover:text-white transition-colors"
+              title="Isi formulir dengan contoh pengisian"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              Muat Contoh
+              <Sparkles className="w-3.5 h-3.5 text-orange-600 dark:text-orange-300" />
+              Contoh Pengisian
             </button>
 
             <button
               type="button"
               onClick={handleClearAll}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-rose-300/40 bg-rose-500/25 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500/40 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-rose-200 dark:border-white/15 bg-rose-50/90 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-semibold text-rose-700 dark:text-slate-200 hover:bg-rose-100 dark:hover:bg-rose-500/30 dark:hover:border-rose-400/40 dark:hover:text-white transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden xl:inline">Bersihkan Formulir</span>
@@ -365,7 +412,7 @@ export function App() {
             <button
               type="button"
               onClick={() => window.print()}
-              className="hidden xl:inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/15 px-3 py-2 text-xs font-semibold text-white hover:bg-white/25 transition-colors"
+              className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-semibold text-emerald-900 dark:text-white hover:bg-white dark:hover:bg-white/20 transition-colors"
               title="Cetak langsung ke printer kertas A4"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -376,8 +423,8 @@ export function App() {
               type="button"
               disabled={exportingType !== null}
               onClick={() => handleExport('excel')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-lime-300 px-3 py-2 text-xs font-bold text-emerald-950 hover:bg-lime-200 disabled:opacity-50 shadow-sm transition-colors"
-              title="Unduh rekap data resi ke file Excel (.xlsx)"
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 py-2 text-xs font-bold text-white hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 shadow-[0_4px_14px_rgba(16,185,129,0.35)] transition-all"
+              title="Unduh rekap data ke file Excel (.xlsx)"
             >
               {exportingType === 'excel' ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -392,7 +439,7 @@ export function App() {
               type="button"
               disabled={exportingType !== null}
               onClick={() => handleExport('pdf')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-xs font-extrabold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50 shadow-md transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2 text-xs font-extrabold text-white hover:from-orange-400 hover:to-amber-400 disabled:opacity-50 shadow-[0_4px_18px_rgba(249,115,22,0.45)] transition-all"
             >
               {exportingType === 'pdf' ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -406,15 +453,15 @@ export function App() {
         </header>
 
         {/* Mobile Tab Switcher */}
-        <div className="lg:hidden sticky top-[61px] z-20 bg-white border-b border-slate-200 px-4 py-2">
-          <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-100 p-1">
+        <div className="lg:hidden sticky top-[61px] z-20 bg-white/80 dark:bg-[#0D1E18]/80 backdrop-blur-xl border-b border-emerald-200/70 dark:border-white/10 px-4 py-2">
+          <div className="grid grid-cols-2 gap-1.5 rounded-full bg-emerald-100/70 dark:bg-white/[0.07] p-1 border border-emerald-200/60 dark:border-white/10">
             <button
               type="button"
               onClick={() => setMobileTab('form')}
-              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all ${
+              className={`inline-flex items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-bold transition-all ${
                 mobileTab === 'form'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
+                  : 'text-emerald-900 dark:text-slate-300'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -423,10 +470,10 @@ export function App() {
             <button
               type="button"
               onClick={() => setMobileTab('preview')}
-              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all ${
+              className={`inline-flex items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-bold transition-all ${
                 mobileTab === 'preview'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
+                  : 'text-emerald-900 dark:text-slate-300'
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
@@ -436,12 +483,12 @@ export function App() {
         </div>
 
         {/* Main Split-Screen Workspace */}
-        <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
-          {/* Left Panel: Cascading Form */}
+        <main className="relative z-10 flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
+          {/* Left Panel: Cascading Glass Form */}
           <section
             className={`${
               mobileTab === 'form' ? 'flex' : 'hidden'
-            } lg:flex flex-col w-full lg:w-[460px] xl:w-[510px] lg:flex-shrink-0 bg-gradient-to-b from-slate-50 via-sky-50/30 to-emerald-50/30 lg:border-r border-slate-200 lg:h-full`}
+            } lg:flex flex-col w-full lg:w-[460px] xl:w-[510px] lg:flex-shrink-0 bg-white/40 dark:bg-black/15 backdrop-blur-sm lg:border-r border-emerald-200/70 dark:border-white/10 lg:h-full`}
           >
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-4 pb-24 lg:pb-8">
               {/* Mobile Quick Utilities */}
@@ -449,15 +496,15 @@ export function App() {
                 <button
                   type="button"
                   onClick={handleLoadSample}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-orange-300 dark:border-orange-400/40 bg-orange-100/80 dark:bg-orange-500/20 backdrop-blur-md px-3 py-2 text-xs font-bold text-orange-900 dark:text-orange-200"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  Muat Contoh
+                  <Sparkles className="w-3.5 h-3.5 text-orange-600 dark:text-orange-300" />
+                  Contoh Pengisian
                 </button>
                 <button
                   type="button"
                   onClick={handleClearAll}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-rose-200 dark:border-rose-400/30 bg-rose-50/90 dark:bg-rose-500/20 backdrop-blur-md px-3 py-2 text-xs font-bold text-rose-700 dark:text-rose-200"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Bersihkan
@@ -508,13 +555,13 @@ export function App() {
                     <button
                       type="button"
                       onClick={handleAddResi}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/70 py-3 px-4 text-sm font-bold text-emerald-800 hover:border-emerald-600 hover:bg-emerald-100/80 transition-all"
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/60 dark:border-emerald-400/50 bg-emerald-50/80 dark:bg-emerald-500/10 backdrop-blur-md py-3 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-200 hover:border-emerald-600 dark:hover:border-emerald-400 hover:bg-emerald-100/80 dark:hover:bg-emerald-500/20 dark:hover:text-white transition-all"
                     >
                       <Plus className="w-4 h-4" />
                       Tambah Resi Baru ({resiList.length} resi • {pages.length} Hal. A4)
                     </button>
-                    <p className="mt-2 text-center text-[11px] text-slate-500">
-                      <span className="font-semibold text-emerald-700">
+                    <p className="mt-2 text-center text-[11px] text-slate-600 dark:text-slate-400">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                         {filledCount} resi terisi
                       </span>{' '}
                       • 4 resi per halaman A4, bertambah otomatis sesuai jumlah koli.
@@ -553,11 +600,11 @@ export function App() {
 
         {/* Mobile Sticky Bottom Bar */}
         {mobileTab === 'form' && (
-          <div className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 px-3 py-2.5 flex items-center gap-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
+          <div className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/85 dark:bg-[#0D1E18]/85 backdrop-blur-xl border-t border-emerald-200/70 dark:border-white/15 px-3 py-2.5 flex items-center gap-2 shadow-[0_-8px_24px_rgba(11,110,79,0.12)] dark:shadow-[0_-8px_24px_rgba(0,0,0,0.4)]">
             <button
               type="button"
               onClick={() => setMobileTab('preview')}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 py-2.5 px-2 text-xs font-bold text-indigo-700"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/20 bg-emerald-50/90 dark:bg-white/10 py-2.5 px-2 text-xs font-bold text-emerald-900 dark:text-white"
             >
               <Eye className="w-4 h-4 flex-shrink-0" />
               <span>
@@ -568,7 +615,7 @@ export function App() {
               type="button"
               disabled={exportingType !== null}
               onClick={() => handleExport('excel')}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 py-2.5 px-3 text-xs font-bold text-emerald-800 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 py-2.5 px-3 text-xs font-bold text-white disabled:opacity-50"
             >
               {exportingType === 'excel' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -581,7 +628,7 @@ export function App() {
               type="button"
               disabled={exportingType !== null}
               onClick={() => handleExport('pdf')}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 px-2 text-xs font-bold text-white shadow-sm disabled:opacity-50"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 py-2.5 px-2 text-xs font-bold text-white shadow-sm disabled:opacity-50"
             >
               {exportingType === 'pdf' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

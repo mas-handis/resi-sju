@@ -41,23 +41,23 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
   };
 
   return (
-    <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200/80">
+    <div className="rounded-2xl border border-emerald-200/80 bg-white/75 dark:border-white/15 dark:bg-white/[0.07] backdrop-blur-xl shadow-[0_8px_32px_rgba(16,185,129,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-emerald-500/15 to-orange-500/10 dark:from-emerald-500/20 dark:to-orange-500/15 border-b border-emerald-200/70 dark:border-white/10">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-emerald-600 text-white">
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-xs">
             <Lock className="w-3 h-3" />
           </span>
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-900">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">
             Kop Pengirim
           </span>
-          <span className="inline-flex items-center rounded-full bg-emerald-600/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+          <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/25 dark:border-emerald-400/30 dark:text-emerald-200">
             2 Opsi
           </span>
         </div>
         <button
           type="button"
           onClick={() => setIsEditing((prev) => !prev)}
-          className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200 hover:bg-white hover:text-emerald-900 transition-colors"
+          className="inline-flex items-center gap-1 rounded-full bg-white/75 px-2.5 py-1 text-xs font-semibold text-orange-700 border border-orange-200 hover:bg-white dark:bg-white/10 dark:text-orange-200 dark:border-white/15 dark:hover:bg-white/20 dark:hover:text-white transition-colors"
         >
           {isEditing ? (
             <>
@@ -74,9 +74,9 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
       </div>
 
       {/* 2-Option Kop Pengirim Switcher (SM vs SJU) */}
-      <div className="px-3.5 pt-3 pb-2 bg-emerald-50/30 border-b border-emerald-100">
+      <div className="px-3.5 pt-3 pb-2 bg-emerald-50/60 border-b border-emerald-200/70 dark:bg-black/15 dark:border-white/10">
         <div
-          className="grid grid-cols-2 gap-1.5 rounded-lg bg-emerald-100/70 p-1"
+          className="grid grid-cols-2 gap-1.5 rounded-full bg-white/80 p-1 border border-emerald-200/80 dark:bg-black/30 dark:border-white/10"
           role="group"
           aria-label="Pilih Kop Pengirim"
         >
@@ -87,10 +87,10 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
                 key={opt.id}
                 type="button"
                 onClick={() => handleSelectPreset(opt.id)}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold transition-all ${
+                className={`inline-flex items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold transition-all ${
                   active
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-emerald-900 hover:bg-white/70'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_3px_12px_rgba(16,185,129,0.35)]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-emerald-100/60 dark:text-slate-300 dark:hover:text-white dark:hover:bg-white/10'
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
@@ -103,18 +103,20 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
 
       {!isEditing ? (
         <div className="p-3.5 flex items-center gap-3">
-          <SuaraMuhammadiyahLogo
-            presetId={sender.presetId}
-            logoDataUrl={sender.logoDataUrl}
-            height={sender.presetId === 'sju' ? 30 : 38}
-            maxWidth={sender.presetId === 'sju' ? 145 : 110}
-          />
+          <div className="rounded-xl bg-white p-1.5 border border-slate-200/80 dark:border-transparent shadow-sm flex-shrink-0">
+            <SuaraMuhammadiyahLogo
+              presetId={sender.presetId}
+              logoDataUrl={sender.logoDataUrl}
+              height={sender.presetId === 'sju' ? 28 : 34}
+              maxWidth={sender.presetId === 'sju' ? 136 : 102}
+            />
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-slate-900 truncate">{sender.title}</p>
-            <p className="text-[11px] font-medium text-slate-600 truncate mt-0.5">
+            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{sender.title}</p>
+            <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 truncate mt-0.5">
               {sender.address}
             </p>
-            <p className="text-[11px] text-slate-400 truncate">
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-300/80 truncate">
               {sender.phone ? `Telp. ${sender.phone}` : ''}
               {sender.phone && sender.email ? ' • ' : ''}
               {sender.email}
@@ -122,15 +124,17 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
           </div>
         </div>
       ) : (
-        <div className="p-4 space-y-3 bg-slate-50/40">
+        <div className="p-4 space-y-3 bg-emerald-50/40 dark:bg-black/20">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <SuaraMuhammadiyahLogo
-                presetId={sender.presetId}
-                logoDataUrl={sender.logoDataUrl}
-                height={32}
-                maxWidth={130}
-              />
+              <div className="rounded-lg bg-white p-1 border border-slate-200/80 dark:border-transparent">
+                <SuaraMuhammadiyahLogo
+                  presetId={sender.presetId}
+                  logoDataUrl={sender.logoDataUrl}
+                  height={28}
+                  maxWidth={110}
+                />
+              </div>
               <div className="flex items-center gap-1.5">
                 <input
                   ref={fileInputRef}
@@ -142,7 +146,7 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/85 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   Ganti Logo
@@ -151,7 +155,7 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
                   <button
                     type="button"
                     onClick={() => onChange({ ...sender, logoDataUrl: null })}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-500 hover:text-red-600"
+                    className="rounded-full border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-100 dark:border-rose-400/30 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/30"
                   >
                     Hapus Logo
                   </button>
@@ -160,8 +164,8 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => onChange({ ...SENDER_PRESETS[sender.presetId] })}
-              className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+              onClick={() => onChange({ ...presets[sender.presetId] })}
+              className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200"
               title="Kembalikan ke default pilihan kop ini"
             >
               <RotateCcw className="w-3 h-3" />
@@ -171,48 +175,48 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
 
           <div className="grid grid-cols-1 gap-2.5">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              <label className="block text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mb-1">
                 Nama Pengirim
               </label>
               <input
                 type="text"
                 value={sender.title}
                 onChange={(e) => onChange({ ...sender, title: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-lg border border-emerald-200/90 bg-white/90 px-2.5 py-1.5 text-xs text-slate-900 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              <label className="block text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mb-1">
                 Alamat
               </label>
               <input
                 type="text"
                 value={sender.address}
                 onChange={(e) => onChange({ ...sender, address: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-lg border border-emerald-200/90 bg-white/90 px-2.5 py-1.5 text-xs text-slate-900 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mb-1">
                   Telepon / HP
                 </label>
                 <input
                   type="text"
                   value={sender.phone}
                   onChange={(e) => onChange({ ...sender, phone: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  className="w-full rounded-lg border border-emerald-200/90 bg-white/90 px-2.5 py-1.5 text-xs text-slate-900 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mb-1">
                   Email (Opsional)
                 </label>
                 <input
                   type="text"
                   value={sender.email}
                   onChange={(e) => onChange({ ...sender, email: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  className="w-full rounded-lg border border-emerald-200/90 bg-white/90 px-2.5 py-1.5 text-xs text-slate-900 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
                 />
               </div>
             </div>
