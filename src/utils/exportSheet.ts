@@ -11,6 +11,9 @@ import {
   A4_HEIGHT_MM,
   A4_PX_WIDTH,
   A4_WIDTH_MM,
+  getBottomRowHeightPx,
+  getKelompokColor,
+  getResiBottomRows,
   paginateResiList,
   RESI_PER_PAGE,
 } from '../constants';
@@ -94,12 +97,14 @@ async function resolveLogoForPdf(sender: SenderHeader): Promise<ResolvedLogo> {
   });
 }
 
-function getCodeFontPx(value: string): number {
+function getCodeFontPx(value: string, rowCount = 1): number {
   const len = value.trim().length;
-  if (len <= 3) return 38;
-  if (len <= 5) return 30;
-  if (len <= 7) return 22;
-  return 17;
+  const scale = rowCount >= 3 ? 0.84 : rowCount === 2 ? 0.92 : 1;
+  let base = 17;
+  if (len <= 3) base = 38;
+  else if (len <= 5) base = 30;
+  else if (len <= 7) base = 22;
+  return Math.round(base * scale);
 }
 
 function formatPhoneDisplay(raw: string): string {
@@ -203,7 +208,10 @@ function drawResiCardPdf(
   w: number,
   h: number
 ): void {
-  const bottomH = 48 * PX_TO_MM; // ~12.70 mm
+  const bottomRows = getResiBottomRows(item);
+  const rowCount = bottomRows.length;
+  const rowHeightMm = getBottomRowHeightPx(rowCount) * PX_TO_MM;
+  const bottomH = rowHeightMm * rowCount;
   const upperH = h - bottomH;
   const rightColW = 144 * PX_TO_MM; // ~38.10 mm
   const leftW = w - rightColW;
@@ -213,10 +221,14 @@ function drawResiCardPdf(
   doc.setFillColor(255, 255, 255);
   doc.rect(x, y, w, h, 'F');
 
-  // 2. Bottom Yellow Bar Background
+  // 2. Bottom Color-Coded Rows Background (1–3 stacked rows)
   const bottomY = y + upperH;
-  doc.setFillColor(255, 235, 0); // #FFEB00
-  doc.rect(x, bottomY, w, bottomH, 'F');
+  bottomRows.forEach((row, idx) => {
+    const colorCfg = getKelompokColor(row.colorId);
+    const [r, g, b] = colorCfg.rgb;
+    doc.setFillColor(r, g, b);
+    doc.rect(x, bottomY + idx * rowHeightMm, w, rowHeightMm, 'F');
+  });
 
   // 3. Measure & layout Kop Pengirim row height (so enlarged Kop fits cleanly)
   const kopCellX = x + leftLabelW;
@@ -478,7 +490,7 @@ function drawResiCardPdf(
   const koliKeTrimmed = sanitizePdfText(item.koliKe.trim());
   if (koliKeTrimmed) {
     const valCenterY = y + cornerHeaderH + (rightHalfH - cornerHeaderH) / 2;
-    const maxPt = getCodeFontPx(koliKeTrimmed) * PX_TO_PT;
+    const maxPt = getCodeFontPx(koliKeTrimmed, rowCount) * PX_TO_PT;
     const fittedPt = fitSingleLinePt(doc, koliKeTrimmed, 'bold', rightColW - 4, 10, maxPt);
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
@@ -492,13 +504,13 @@ function drawResiCardPdf(
     const koliMatch = dariTrimmed.match(/^(\d+)(?:\s*koli)?$/i);
     if (koliMatch) {
       const numStr = koliMatch[1];
-      const maxNumPt = getCodeFontPx(numStr) * PX_TO_PT;
+      const maxNumPt = getCodeFontPx(numStr, rowCount) * PX_TO_PT;
       const numPt = fitSingleLinePt(doc, numStr, 'bold', rightColW - 4, 10, maxNumPt);
-      const koliPt = 10 * PX_TO_PT; // 7.5 pt
+      const koliPt = (rowCount >= 3 ? 9 : 10) * PX_TO_PT;
 
       const numCapMm = numPt * PT_TO_MM * CAP_HEIGHT_RATIO;
       const koliCapMm = koliPt * PT_TO_MM * CAP_HEIGHT_RATIO;
-      const stackGapMm = 1.4;
+      const stackGapMm = rowCount >= 3 ? 1.1 : 1.4;
       const totalStackMm = numCapMm + stackGapMm + koliCapMm;
       const stackTopY = dariCenterY - totalStackMm / 2;
 
@@ -514,7 +526,7 @@ function drawResiCardPdf(
         align: 'center',
       });
     } else {
-      const maxPt = getCodeFontPx(dariTrimmed) * PX_TO_PT;
+      const maxPt = getCodeFontPx(dariTrimmed, rowCount) * PX_TO_PT;
       const fittedPt = fitSingleLinePt(doc, dariTrimmed, 'bold', rightColW - 4, 9, maxPt);
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'bold');
@@ -522,64 +534,80 @@ function drawResiCardPdf(
     }
   }
 
-  // 11. Bottom Yellow Bar Left: Pesanan / Nama Barang (Centered X & Y)
-  const barangText = sanitizePdfText(item.namaBarang.trim()).toUpperCase();
-  if (barangText) {
-    const bPadX = 12 * PX_TO_MM;
-    const bPadY = 4 * PX_TO_MM;
-    const bAvailW = leftW - bPadX * 2;
-    const bAvailH = bottomH - bPadY * 2;
+  // 11 & 12. Bottom 1–3 Color-Coded Rows (Pesanan + QTY)
+  const barangMaxPx = rowCount >= 3 ? 15 : rowCount === 2 ? 18 : 24;
+  const barangMinPx = rowCount >= 3 ? 8.5 : 10;
+  const qtyLabelPx = rowCount >= 3 ? 7.5 : rowCount === 2 ? 8 : 9;
+  const qtyMaxPx = rowCount >= 3 ? 13 : rowCount === 2 ? 16 : 22;
+  const qtyMinPx = rowCount >= 3 ? 8.5 : 8.25;
 
-    doc.setFont('helvetica', 'bold');
-    let bestPt = 8.25;
-    let bestLines: string[] = [barangText];
-    for (let px = 24; px >= 10; px -= 0.5) {
-      const pt = px * PX_TO_PT;
-      doc.setFontSize(pt);
-      const wrapped: string[] = doc.splitTextToSize(barangText, bAvailW);
-      const fontMm = pt * PT_TO_MM;
-      const blockH =
-        fontMm * CAP_HEIGHT_RATIO + (wrapped.length - 1) * fontMm * 1.15;
-      if (blockH <= bAvailH) {
-        bestPt = pt;
-        bestLines = wrapped;
-        break;
+  bottomRows.forEach((row, idx) => {
+    const rowY = bottomY + idx * rowHeightMm;
+    const rowCenterY = rowY + rowHeightMm / 2;
+
+    const barangText = sanitizePdfText(row.namaBarang.trim()).toUpperCase();
+    if (barangText) {
+      const bPadX = (rowCount >= 3 ? 10 : 12) * PX_TO_MM;
+      const bPadY = (rowCount >= 3 ? 2.5 : 4) * PX_TO_MM;
+      const bAvailW = leftW - bPadX * 2;
+      const bAvailH = rowHeightMm - bPadY * 2;
+
+      doc.setFont('helvetica', 'bold');
+      let bestPt = barangMinPx * PX_TO_PT;
+      let bestLines: string[] = [barangText];
+      for (let px = barangMaxPx; px >= barangMinPx; px -= 0.5) {
+        const pt = px * PX_TO_PT;
+        doc.setFontSize(pt);
+        const wrapped: string[] = doc.splitTextToSize(barangText, bAvailW);
+        const fontMm = pt * PT_TO_MM;
+        const blockH =
+          fontMm * CAP_HEIGHT_RATIO + (wrapped.length - 1) * fontMm * 1.15;
+        if (blockH <= bAvailH) {
+          bestPt = pt;
+          bestLines = wrapped;
+          break;
+        }
       }
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      drawCenteredLines(doc, bestLines, x + leftW / 2, rowCenterY, bestPt, 1.15);
     }
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
-    drawCenteredLines(doc, bestLines, x + leftW / 2, bottomY + bottomH / 2, bestPt, 1.15);
-  }
+    const qtyText = sanitizePdfText(row.qty.trim());
+    const qtyLabelPt = qtyLabelPx * PX_TO_PT;
+    const qtyLabelCapMm = qtyLabelPt * PT_TO_MM * CAP_HEIGHT_RATIO;
 
-  // 12. Bottom Yellow Bar Right: QTY + Value (Centered X & Y)
-  const qtyText = sanitizePdfText(item.qty.trim());
-  const qtyLabelPt = 9 * PX_TO_PT; // 6.75 pt
-  const qtyLabelCapMm = qtyLabelPt * PT_TO_MM * CAP_HEIGHT_RATIO;
-  const qtyCenterY = bottomY + bottomH / 2;
+    if (qtyText) {
+      const qAvailW = rightColW - 16 * PX_TO_MM;
+      const qtyValPt = fitSingleLinePt(
+        doc,
+        qtyText,
+        'bold',
+        qAvailW,
+        qtyMinPx * PX_TO_PT,
+        qtyMaxPx * PX_TO_PT
+      );
+      const qtyValCapMm = qtyValPt * PT_TO_MM * CAP_HEIGHT_RATIO;
+      const qtyGapMm = rowCount >= 3 ? 0.85 : 1.15;
+      const totalStackMm = qtyLabelCapMm + qtyGapMm + qtyValCapMm;
+      const stackTopY = rowCenterY - totalStackMm / 2;
 
-  if (qtyText) {
-    const qAvailW = rightColW - 16 * PX_TO_MM;
-    const qtyValPt = fitSingleLinePt(doc, qtyText, 'bold', qAvailW, 8.25, 22 * PX_TO_PT);
-    const qtyValCapMm = qtyValPt * PT_TO_MM * CAP_HEIGHT_RATIO;
-    const qtyGapMm = 1.2;
-    const totalStackMm = qtyLabelCapMm + qtyGapMm + qtyValCapMm;
-    const stackTopY = qtyCenterY - totalStackMm / 2;
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(qtyLabelPt);
+      doc.text('QTY', rightCenterX, stackTopY + qtyLabelCapMm, { align: 'center' });
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(qtyLabelPt);
-    doc.text('QTY', rightCenterX, stackTopY + qtyLabelCapMm, { align: 'center' });
-
-    doc.setFontSize(qtyValPt);
-    doc.text(qtyText, rightCenterX, stackTopY + qtyLabelCapMm + qtyGapMm + qtyValCapMm, {
-      align: 'center',
-    });
-  } else {
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
-    drawCenteredLines(doc, ['QTY'], rightCenterX, qtyCenterY, qtyLabelPt, 1.1);
-  }
+      doc.setFontSize(qtyValPt);
+      doc.text(qtyText, rightCenterX, stackTopY + qtyLabelCapMm + qtyGapMm + qtyValCapMm, {
+        align: 'center',
+      });
+    } else {
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      drawCenteredLines(doc, ['QTY'], rightCenterX, rowCenterY, qtyLabelPt, 1.1);
+    }
+  });
 
   // 13. Crisp Vector Borders (drawn last so lines are clean over background fills)
   doc.setDrawColor(0, 0, 0);
@@ -593,7 +621,10 @@ function drawResiCardPdf(
   doc.line(x + leftLabelW, y, x + leftLabelW, y + upperH);
   doc.line(x, y + kopRowH, x + leftW, y + kopRowH);
   doc.line(rightX, y + rightHalfH, rightX + rightColW, y + rightHalfH);
-  doc.line(x, bottomY, x + w, bottomY);
+  for (let idx = 0; idx < rowCount; idx += 1) {
+    const lineY = bottomY + idx * rowHeightMm;
+    doc.line(x, lineY, x + w, lineY);
+  }
 
   // Heavy 2px outer & vertical corner dividers
   doc.setLineWidth(2 * PX_TO_MM);

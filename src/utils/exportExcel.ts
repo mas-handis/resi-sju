@@ -1,24 +1,18 @@
 import * as XLSX from 'xlsx';
+import {
+  getKelompokColor,
+  getResiBottomRows,
+  isResiFilled,
+} from '../constants';
 import { ResiItem, SenderHeader } from '../types';
 import { buildTimestamp } from './exportSheet';
-
-function isItemFilled(item: ResiItem): boolean {
-  return Boolean(
-    item.kepada.trim() ||
-      item.noHp.trim() ||
-      item.namaBarang.trim() ||
-      item.qty.trim() ||
-      item.dari.trim() ||
-      item.koliKe.trim()
-  );
-}
 
 /**
  * Generates and downloads an Excel (.xlsx) recap of the shipping receipts.
  */
 export function downloadResiExcel(resiList: ResiItem[], sender: SenderHeader): string {
-  const hasAnyFilled = resiList.some(isItemFilled);
-  const itemsToExport = hasAnyFilled ? resiList.filter(isItemFilled) : resiList;
+  const hasAnyFilled = resiList.some(isResiFilled);
+  const itemsToExport = hasAnyFilled ? resiList.filter(isResiFilled) : resiList;
 
   const headers = [
     'No',
@@ -26,6 +20,7 @@ export function downloadResiExcel(resiList: ResiItem[], sender: SenderHeader): s
     'Penerima / Instansi',
     'Alamat Tujuan',
     'No. HP Penerima',
+    'Kelompok / Warna',
     'Pesanan / Nama Barang',
     'QTY',
     'Koli Ke',
@@ -45,14 +40,37 @@ export function downloadResiExcel(resiList: ResiItem[], sender: SenderHeader): s
     const dariTrimmed = item.dari.trim();
     const formattedDari = /^\d+$/.test(dariTrimmed) ? `${dariTrimmed} KOLI` : dariTrimmed;
 
+    const bottomRows = getResiBottomRows(item);
+    const activeRows =
+      bottomRows.length > 1
+        ? bottomRows.filter((r) => r.namaBarang.trim() || r.qty.trim())
+        : bottomRows;
+    const rowsForExport = activeRows.length > 0 ? activeRows : [bottomRows[0]];
+
+    const kelompokSummary = rowsForExport
+      .map((r) => {
+        const cfg = getKelompokColor(r.colorId);
+        return `${cfg.label} (${cfg.colorName})`;
+      })
+      .join('; ');
+    const barangSummary = rowsForExport
+      .map((r) => r.namaBarang.trim())
+      .filter(Boolean)
+      .join('; ');
+    const qtySummary = rowsForExport
+      .map((r) => r.qty.trim())
+      .filter(Boolean)
+      .join('; ');
+
     return [
       idx + 1,
       sender.title,
       penerima,
       alamat,
       item.noHp.trim(),
-      item.namaBarang.trim(),
-      item.qty.trim(),
+      kelompokSummary,
+      barangSummary,
+      qtySummary,
       item.koliKe.trim(),
       formattedDari,
       sender.address,

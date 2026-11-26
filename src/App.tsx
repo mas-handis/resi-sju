@@ -20,6 +20,7 @@ import {
   createEmptyResi,
   createSampleResiList,
   DEFAULT_SENDER_HEADER,
+  isResiFilled,
   paginateResiList,
   RESI_PER_PAGE,
 } from './constants';
@@ -80,6 +81,7 @@ export function App() {
     const duplicated: ResiItem = {
       ...source,
       id: crypto.randomUUID(),
+      extraRows: source.extraRows?.map((r) => ({ ...r, id: crypto.randomUUID() })),
     };
 
     setResiList((prev) => {
@@ -113,6 +115,10 @@ export function App() {
     const generated: ResiItem[] = Array.from({ length: clampedCount }, (_, idx) => ({
       ...source,
       id: idx === 0 ? source.id : crypto.randomUUID(),
+      extraRows:
+        idx === 0
+          ? source.extraRows
+          : source.extraRows?.map((r) => ({ ...r, id: crypto.randomUUID() })),
       koliKe: String(idx + 1),
       dari: `${clampedCount} KOLI`,
     }));
@@ -159,16 +165,6 @@ export function App() {
       return next;
     });
   };
-
-  const isResiFilled = (r: ResiItem) =>
-    Boolean(
-      r.kepada.trim() ||
-        r.noHp.trim() ||
-        r.namaBarang.trim() ||
-        r.qty.trim() ||
-        r.dari.trim() ||
-        r.koliKe.trim()
-    );
 
   const handleClearAll = () => {
     const previous = resiList;

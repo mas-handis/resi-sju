@@ -7,12 +7,19 @@ import {
   Layers,
   MapPin,
   Package,
+  Palette,
   Phone,
   Plus,
   Trash2,
+  X,
   Zap,
 } from 'lucide-react';
-import { ResiItem } from '../types';
+import {
+  getKelompokColor,
+  KELOMPOK_COLOR_OPTIONS,
+  MAX_BOTTOM_COLOR_ROWS,
+} from '../constants';
+import { KelompokColorId, ResiBottomRow, ResiItem } from '../types';
 
 interface ResiFormCardProps {
   item: ResiItem;
@@ -102,6 +109,44 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
     if (!Number.isNaN(parsed) && String(parsed) === trimmed) {
       onChange({ koliKe: String(parsed + 1) });
     }
+  };
+
+  const extras = item.extraRows ?? [];
+  const totalBottomRows = 1 + extras.length;
+  const primaryColor = getKelompokColor(item.colorId);
+
+  const handleAddExtraRow = () => {
+    if (totalBottomRows >= MAX_BOTTOM_COLOR_ROWS) return;
+    const usedColors = new Set<KelompokColorId>([
+      item.colorId ?? 'kelompok_a',
+      ...extras.map((r) => r.colorId),
+    ]);
+    const nextColor =
+      KELOMPOK_COLOR_OPTIONS.find((opt) => !usedColors.has(opt.id))?.id ??
+      'kelompok_b';
+
+    const newRow: ResiBottomRow = {
+      id: crypto.randomUUID(),
+      colorId: nextColor,
+      namaBarang: '',
+      qty: '',
+    };
+    onChange({ extraRows: [...extras, newRow] });
+  };
+
+  const handleUpdateExtraRow = (
+    rowId: string,
+    patch: Partial<ResiBottomRow>
+  ) => {
+    onChange({
+      extraRows: extras.map((r) => (r.id === rowId ? { ...r, ...patch } : r)),
+    });
+  };
+
+  const handleDeleteExtraRow = (rowId: string) => {
+    onChange({
+      extraRows: extras.filter((r) => r.id !== rowId),
+    });
   };
 
   return (
@@ -238,57 +283,208 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
           </div>
         </div>
 
-        {/* Group 2: Baris Kuning Resi (Pesanan & QTY) */}
-        <div className="rounded-xl bg-amber-50/90 border border-amber-300/80 p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <label
-                  htmlFor={`barang-${item.id}`}
-                  className="flex items-center gap-1.5 text-xs font-bold text-amber-950"
-                >
-                  <Package className="w-3.5 h-3.5 text-amber-600" />
-                  Pesanan / Barang
-                </label>
-                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold bg-[#FFEB00] text-slate-900 border border-amber-500/60">
-                  Blok Kuning
-                </span>
-              </div>
-              <input
-                id={`barang-${item.id}`}
-                type="text"
-                value={item.namaBarang}
-                onFocus={onFocus}
-                onChange={(e) => onChange({ namaBarang: e.target.value })}
-                placeholder="Contoh: MAP LAMA KARTON TK"
-                className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
-              />
+        {/* Group 2: Baris Warna Resi (Kelompok, Pesanan & QTY — hingga 3 baris warna) */}
+        <div className="rounded-xl bg-amber-50/75 border border-amber-300/80 p-3 space-y-3">
+          {/* Baris Warna Utama (#1) */}
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                <Palette className="w-3.5 h-3.5 text-amber-600" />
+                Warna Kelompok {totalBottomRows > 1 ? '#1' : ''}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-extrabold ${primaryColor.pillClass}`}
+              >
+                {primaryColor.label} • {primaryColor.colorName}
+              </span>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
+            {/* 4 Pilihan Warna Kelompok */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {KELOMPOK_COLOR_OPTIONS.map((opt) => {
+                const selected = (item.colorId ?? 'kelompok_a') === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFocus();
+                      onChange({ colorId: opt.id });
+                    }}
+                    className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] font-bold transition-all ${
+                      selected
+                        ? 'border-slate-900 bg-white text-slate-950 ring-2 ring-slate-900/15 shadow-xs'
+                        : 'border-slate-200 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-white'
+                    }`}
+                    title={`${opt.label} (${opt.colorName})`}
+                  >
+                    <span
+                      className="h-3.5 w-3.5 rounded-sm border border-black/40 flex-shrink-0"
+                      style={{ backgroundColor: opt.hex }}
+                    />
+                    <span className="truncate">{opt.shortLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="sm:col-span-2">
+                <label
+                  htmlFor={`barang-${item.id}`}
+                  className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-1"
+                >
+                  <Package className="w-3.5 h-3.5 text-amber-600" />
+                  Pesanan / Barang {totalBottomRows > 1 ? '#1' : ''}
+                </label>
+                <input
+                  id={`barang-${item.id}`}
+                  type="text"
+                  value={item.namaBarang}
+                  onFocus={onFocus}
+                  onChange={(e) => onChange({ namaBarang: e.target.value })}
+                  placeholder="Contoh: BUKU PAKET KELOMPOK A"
+                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+                />
+              </div>
+
+              <div>
                 <label
                   htmlFor={`qty-${item.id}`}
-                  className="block text-xs font-bold text-amber-950"
+                  className="block text-xs font-bold text-slate-800 mb-1"
                 >
-                  QTY
+                  QTY {totalBottomRows > 1 ? '#1' : ''}
                 </label>
-                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold bg-[#FFEB00] text-slate-900 border border-amber-500/60">
-                  Kuning
-                </span>
+                <input
+                  id={`qty-${item.id}`}
+                  type="text"
+                  inputMode="numeric"
+                  value={item.qty}
+                  onFocus={onFocus}
+                  onChange={(e) =>
+                    onChange({ qty: e.target.value.replace(/[^\d]/g, '') })
+                  }
+                  placeholder="12"
+                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+                />
               </div>
-              <input
-                id={`qty-${item.id}`}
-                type="text"
-                inputMode="numeric"
-                value={item.qty}
-                onFocus={onFocus}
-                onChange={(e) => onChange({ qty: e.target.value.replace(/[^\d]/g, '') })}
-                placeholder="12"
-                className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
-              />
             </div>
           </div>
+
+          {/* Baris Warna Tambahan (#2 & #3) */}
+          {extras.map((extra, extraIdx) => {
+            const rowNum = extraIdx + 2;
+            const rowColor = getKelompokColor(extra.colorId);
+            return (
+              <div
+                key={extra.id}
+                className="pt-3 border-t border-amber-300/70 space-y-2.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-bold text-slate-900">
+                      Warna Kelompok #{rowNum}
+                    </span>
+                    <span
+                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-extrabold ${rowColor.pillClass}`}
+                    >
+                      {rowColor.label} • {rowColor.colorName}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteExtraRow(extra.id);
+                    }}
+                    title={`Hapus baris warna #${rowNum}`}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-100/70 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Hapus
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {KELOMPOK_COLOR_OPTIONS.map((opt) => {
+                    const selected = extra.colorId === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onFocus();
+                          handleUpdateExtraRow(extra.id, { colorId: opt.id });
+                        }}
+                        className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] font-bold transition-all ${
+                          selected
+                            ? 'border-slate-900 bg-white text-slate-950 ring-2 ring-slate-900/15 shadow-xs'
+                            : 'border-slate-200 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-white'
+                        }`}
+                        title={`${opt.label} (${opt.colorName})`}
+                      >
+                        <span
+                          className="h-3.5 w-3.5 rounded-sm border border-black/40 flex-shrink-0"
+                          style={{ backgroundColor: opt.hex }}
+                        />
+                        <span className="truncate">{opt.shortLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="sm:col-span-2">
+                    <input
+                      type="text"
+                      value={extra.namaBarang}
+                      onFocus={onFocus}
+                      onChange={(e) =>
+                        handleUpdateExtraRow(extra.id, {
+                          namaBarang: e.target.value,
+                        })
+                      }
+                      placeholder={`Pesanan / Barang #${rowNum} (${rowColor.label})`}
+                      className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={extra.qty}
+                      onFocus={onFocus}
+                      onChange={(e) =>
+                        handleUpdateExtraRow(extra.id, {
+                          qty: e.target.value.replace(/[^\d]/g, ''),
+                        })
+                      }
+                      placeholder={`QTY #${rowNum}`}
+                      className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Tombol Tambah Baris Warna (Maks 3 Kelompok dalam 1 Resi) */}
+          {totalBottomRows < MAX_BOTTOM_COLOR_ROWS && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFocus();
+                handleAddExtraRow();
+              }}
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-amber-400 bg-white/80 py-1.5 px-3 text-xs font-bold text-amber-900 hover:bg-white hover:border-amber-500 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Tambah Kolom Warna Kelompok ({totalBottomRows}/{MAX_BOTTOM_COLOR_ROWS})
+            </button>
+          )}
         </div>
 
         {/* Group 3: Kotak Angka Kanan + Generate Otomatis Banyak Koli */}

@@ -1,4 +1,9 @@
 import React, { useLayoutEffect, useRef } from 'react';
+import {
+  getBottomRowHeightPx,
+  getKelompokColor,
+  getResiBottomRows,
+} from '../constants';
 import { ResiItem, SenderHeader } from '../types';
 import { SuaraMuhammadiyahLogo } from './SuaraMuhammadiyahLogo';
 
@@ -8,12 +13,14 @@ interface ResiCardPrintProps {
   isExport?: boolean;
 }
 
-function getCodeFontSize(value: string): number {
+function getCodeFontSize(value: string, rowCount = 1): number {
   const len = value.trim().length;
-  if (len <= 3) return 38;
-  if (len <= 5) return 30;
-  if (len <= 7) return 22;
-  return 17;
+  const scale = rowCount >= 3 ? 0.84 : rowCount === 2 ? 0.92 : 1;
+  let base = 17;
+  if (len <= 3) base = 38;
+  else if (len <= 5) base = 30;
+  else if (len <= 7) base = 22;
+  return Math.round(base * scale);
 }
 
 function formatPhoneDisplay(raw: string): string {
@@ -37,8 +44,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   const restLines = kepadaLines.slice(1).join('\n');
   const hasKepada = item.kepada.trim().length > 0;
   const hasNoHp = item.noHp.trim().length > 0;
-  const hasBarang = item.namaBarang.trim().length > 0;
-  const hasQty = item.qty.trim().length > 0;
+  const bottomRows = getResiBottomRows(item);
+  const bottomRowHeight = getBottomRowHeightPx(bottomRows.length);
+  const bottomRowsSignature = bottomRows
+    .map((r) => `${r.colorId}|${r.namaBarang}|${r.qty}`)
+    .join(';;');
 
   // Detect "<number>" or "<number> KOLI" in `dari` so "KOLI" always renders automatically below the number
   const dariTrimmed = item.dari.trim();
@@ -57,11 +67,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   const restLinesRef = useRef<HTMLDivElement | null>(null);
   const noHpRef = useRef<HTMLDivElement | null>(null);
 
-  // Refs for auto-fitting yellow bottom bars (Pesanan & QTY)
-  const barangBoxRef = useRef<HTMLDivElement | null>(null);
-  const barangTextRef = useRef<HTMLDivElement | null>(null);
-  const qtyBoxRef = useRef<HTMLDivElement | null>(null);
-  const qtyTextRef = useRef<HTMLDivElement | null>(null);
+  // Refs for auto-fitting 1–3 colored bottom rows (Pesanan & QTY)
+  const barangBoxRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const barangTextRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const qtyBoxRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const qtyTextRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useLayoutEffect(() => {
     const box = kepadaBoxRef.current;
@@ -90,7 +100,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       }
     };
 
-    const minSize = 10;
+    const minSize = 9;
     const maxSize = 32;
 
     let low = minSize;
@@ -101,7 +111,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       const mid = Math.floor((low + high) / 2);
       applySize(mid);
 
-      // Leave a 10px vertical safety buffer so descenders never clip in html2canvas/print
+      // Leave a 10px vertical safety buffer so descenders never clip in print
       const fitsHeight = content.scrollHeight <= availH - 10;
       const fitsWidth = content.scrollWidth <= availW;
 
@@ -114,7 +124,15 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     }
 
     applySize(best);
-  }, [item.kepada, item.noHp, hasKepada, hasNoHp, sender.presetId, sender.logoDataUrl]);
+  }, [
+    item.kepada,
+    item.noHp,
+    hasKepada,
+    hasNoHp,
+    bottomRows.length,
+    sender.presetId,
+    sender.logoDataUrl,
+  ]);
 
   useLayoutEffect(() => {
     const fitSingleBox = (
@@ -122,7 +140,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       textEl: HTMLDivElement | null,
       minSize: number,
       maxSize: number,
-      extraReserveH = 8
+      extraReserveH = 6
     ) => {
       if (!box || !textEl) return;
       const style = getComputedStyle(box);
@@ -150,13 +168,34 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       textEl.style.fontSize = `${best}px`;
     };
 
-    if (hasBarang) {
-      fitSingleBox(barangBoxRef.current, barangTextRef.current, 11, 24, 6);
-    }
-    if (hasQty) {
-      fitSingleBox(qtyBoxRef.current, qtyTextRef.current, 11, 22, 16);
-    }
-  }, [item.namaBarang, item.qty, hasBarang, hasQty]);
+    const rowCount = bottomRows.length;
+    const barangMax = rowCount >= 3 ? 15 : rowCount === 2 ? 18 : 24;
+    const barangMin = rowCount >= 3 ? 9 : 10;
+    const qtyMax = rowCount >= 3 ? 13 : rowCount === 2 ? 16 : 22;
+    const qtyMin = rowCount >= 3 ? 9 : 10;
+    const qtyReserve = rowCount >= 3 ? 10 : rowCount === 2 ? 12 : 16;
+
+    bottomRows.forEach((row, idx) => {
+      if (row.namaBarang.trim()) {
+        fitSingleBox(
+          barangBoxRefs.current[idx],
+          barangTextRefs.current[idx],
+          barangMin,
+          barangMax,
+          rowCount >= 3 ? 3 : 6
+        );
+      }
+      if (row.qty.trim()) {
+        fitSingleBox(
+          qtyBoxRefs.current[idx],
+          qtyTextRefs.current[idx],
+          qtyMin,
+          qtyMax,
+          qtyReserve
+        );
+      }
+    });
+  }, [bottomRowsSignature, bottomRows.length]);
 
   useLayoutEffect(() => {
     const box = kopBoxRef.current;
@@ -514,7 +553,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 <span
                   style={{
                     display: 'block',
-                    fontSize: `${getCodeFontSize(item.koliKe)}px`,
+                    fontSize: `${getCodeFontSize(item.koliKe, bottomRows.length)}px`,
                     fontWeight: 900,
                     lineHeight: 1,
                     color: '#000000',
@@ -572,7 +611,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                     <span
                       style={{
                         display: 'block',
-                        fontSize: `${getCodeFontSize(koliMatch[1])}px`,
+                        fontSize: `${getCodeFontSize(koliMatch[1], bottomRows.length)}px`,
                         fontWeight: 900,
                         lineHeight: 0.95,
                         color: '#000000',
@@ -585,7 +624,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                     <span
                       style={{
                         display: 'block',
-                        fontSize: '10px',
+                        fontSize: bottomRows.length >= 3 ? '9px' : '10px',
                         fontWeight: 800,
                         lineHeight: 1,
                         letterSpacing: '0.12em',
@@ -600,7 +639,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                   <span
                     style={{
                       display: 'block',
-                      fontSize: `${getCodeFontSize(dariTrimmed)}px`,
+                      fontSize: `${getCodeFontSize(dariTrimmed, bottomRows.length)}px`,
                       fontWeight: 900,
                       lineHeight: 1,
                       color: '#000000',
@@ -620,136 +659,163 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
         </div>
       </div>
 
-      {/* Bottom Row: Left = Pesanan (Yellow, Centered), Right Corner Row 3 = QTY inside Yellow Box */}
+      {/* Bottom Rows: 1 to 3 stacked color-coded rows (Kelompok A/B/KB/Tanpa Kelompok) */}
       <div
         style={{
-          borderTop: '1.5px solid #000000',
           display: 'flex',
-          flexDirection: 'row',
-          height: '48px',
+          flexDirection: 'column',
           flexShrink: 0,
         }}
       >
-        <div
-          ref={barangBoxRef}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            backgroundColor: '#FFEB00',
-            WebkitPrintColorAdjust: 'exact',
-            printColorAdjust: 'exact',
-            padding: '4px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-          }}
-        >
-          {hasBarang ? (
-            <div
-              ref={barangTextRef}
-              style={{
-                width: '100%',
-                fontSize: '22px',
-                fontWeight: 900,
-                letterSpacing: '0.02em',
-                lineHeight: 1.15,
-                color: '#000000',
-                textTransform: 'uppercase',
-                textAlign: 'center',
-                wordBreak: 'break-word',
-              }}
-            >
-              {item.namaBarang}
-            </div>
-          ) : !isExport ? (
-            <div
-              style={{
-                width: '100%',
-                color: '#854D0E',
-                opacity: 0.55,
-                fontWeight: 700,
-                fontStyle: 'italic',
-                fontSize: '15px',
-                textAlign: 'center',
-              }}
-            >
-              Pesanan / nama barang...
-            </div>
-          ) : (
-            '\u00A0'
-          )}
-        </div>
+        {bottomRows.map((row, idx) => {
+          const colorCfg = getKelompokColor(row.colorId);
+          const hasRowBarang = row.namaBarang.trim().length > 0;
+          const hasRowQty = row.qty.trim().length > 0;
+          const qtyLabelFontSize =
+            bottomRows.length >= 3 ? '7.5px' : bottomRows.length === 2 ? '8px' : '9px';
 
-        {/* Corner Row 3: QTY inside yellow box */}
-        <div
-          ref={qtyBoxRef}
-          style={{
-            width: `${RIGHT_COL_WIDTH}px`,
-            flexShrink: 0,
-            borderLeft: '2px solid #000000',
-            backgroundColor: '#FFEB00',
-            WebkitPrintColorAdjust: 'exact',
-            printColorAdjust: 'exact',
-            padding: '3px 8px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '2px',
-            textAlign: 'center',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-          }}
-        >
-          <span
-            style={{
-              display: 'block',
-              fontSize: '9px',
-              fontWeight: 800,
-              letterSpacing: '0.1em',
-              lineHeight: 1,
-              color: '#000000',
-            }}
-          >
-            QTY
-          </span>
-          {hasQty ? (
+          return (
             <div
-              ref={qtyTextRef}
+              key={row.id}
               style={{
-                width: '100%',
-                fontSize: '21px',
-                fontWeight: 900,
-                letterSpacing: '0.02em',
-                lineHeight: 1,
-                color: '#000000',
-                fontVariantNumeric: 'tabular-nums',
-                textAlign: 'center',
-                wordBreak: 'break-word',
+                borderTop: '1.5px solid #000000',
+                display: 'flex',
+                flexDirection: 'row',
+                height: `${bottomRowHeight}px`,
+                flexShrink: 0,
               }}
             >
-              {item.qty}
+              <div
+                ref={(el) => {
+                  barangBoxRefs.current[idx] = el;
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  backgroundColor: colorCfg.hex,
+                  WebkitPrintColorAdjust: 'exact',
+                  printColorAdjust: 'exact',
+                  padding: bottomRows.length >= 3 ? '2px 10px' : '4px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {hasRowBarang ? (
+                  <div
+                    ref={(el) => {
+                      barangTextRefs.current[idx] = el;
+                    }}
+                    style={{
+                      width: '100%',
+                      fontSize: bottomRows.length >= 3 ? '14px' : bottomRows.length === 2 ? '17px' : '22px',
+                      fontWeight: 900,
+                      letterSpacing: '0.02em',
+                      lineHeight: 1.15,
+                      color: colorCfg.textHex,
+                      textTransform: 'uppercase',
+                      textAlign: 'center',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {row.namaBarang}
+                  </div>
+                ) : !isExport ? (
+                  <div
+                    style={{
+                      width: '100%',
+                      color: colorCfg.placeholderHex,
+                      opacity: 0.72,
+                      fontWeight: 700,
+                      fontStyle: 'italic',
+                      fontSize: bottomRows.length >= 3 ? '12px' : '14px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {`Pesanan (${colorCfg.label})...`}
+                  </div>
+                ) : (
+                  '\u00A0'
+                )}
+              </div>
+
+              {/* Corner QTY cell matching row color */}
+              <div
+                ref={(el) => {
+                  qtyBoxRefs.current[idx] = el;
+                }}
+                style={{
+                  width: `${RIGHT_COL_WIDTH}px`,
+                  flexShrink: 0,
+                  borderLeft: '2px solid #000000',
+                  backgroundColor: colorCfg.hex,
+                  WebkitPrintColorAdjust: 'exact',
+                  printColorAdjust: 'exact',
+                  padding: bottomRows.length >= 3 ? '2px 8px' : '3px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: bottomRows.length >= 3 ? '1px' : '2px',
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: qtyLabelFontSize,
+                    fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    lineHeight: 1,
+                    color: colorCfg.textHex,
+                  }}
+                >
+                  QTY
+                </span>
+                {hasRowQty ? (
+                  <div
+                    ref={(el) => {
+                      qtyTextRefs.current[idx] = el;
+                    }}
+                    style={{
+                      width: '100%',
+                      fontSize: bottomRows.length >= 3 ? '13px' : bottomRows.length === 2 ? '16px' : '21px',
+                      fontWeight: 900,
+                      letterSpacing: '0.02em',
+                      lineHeight: 1,
+                      color: colorCfg.textHex,
+                      fontVariantNumeric: 'tabular-nums',
+                      textAlign: 'center',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {row.qty}
+                  </div>
+                ) : !isExport ? (
+                  <span
+                    style={{
+                      color: colorCfg.placeholderHex,
+                      opacity: 0.65,
+                      fontWeight: 700,
+                      fontStyle: 'italic',
+                      fontSize: bottomRows.length >= 3 ? '11px' : '13px',
+                      lineHeight: 1.05,
+                    }}
+                  >
+                    —
+                  </span>
+                ) : (
+                  <span style={{ lineHeight: 1 }}>{'\u00A0'}</span>
+                )}
+              </div>
             </div>
-          ) : !isExport ? (
-            <span
-              style={{
-                color: '#854D0E',
-                opacity: 0.5,
-                fontWeight: 700,
-                fontStyle: 'italic',
-                fontSize: '13px',
-                lineHeight: 1.1,
-              }}
-            >
-              —
-            </span>
-          ) : (
-            <span style={{ lineHeight: 1.1 }}>{'\u00A0'}</span>
-          )}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
