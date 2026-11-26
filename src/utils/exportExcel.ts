@@ -42,6 +42,8 @@ export function downloadResiExcel(resiList: ResiItem[], sender: SenderHeader): s
     const penerima = kepadaLines[0] ?? '';
     const alamat = kepadaLines.length > 1 ? kepadaLines.slice(1).join(', ') : '';
     const kontakPengirim = [sender.phone, sender.email].filter(Boolean).join(' | ');
+    const dariTrimmed = item.dari.trim();
+    const formattedDari = /^\d+$/.test(dariTrimmed) ? `${dariTrimmed} KOLI` : dariTrimmed;
 
     return [
       idx + 1,
@@ -52,7 +54,7 @@ export function downloadResiExcel(resiList: ResiItem[], sender: SenderHeader): s
       item.namaBarang.trim(),
       item.qty.trim(),
       item.koliKe.trim(),
-      item.dari.trim(),
+      formattedDari,
       sender.address,
       kontakPengirim,
     ];

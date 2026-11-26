@@ -336,15 +336,22 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                 <Hash className="w-3.5 h-3.5 text-indigo-600" />
                 Dari (Total Koli)
               </label>
-              <input
-                id={`dari-${item.id}`}
-                type="text"
-                value={item.dari}
-                onFocus={onFocus}
-                onChange={(e) => onChange({ dari: e.target.value })}
-                placeholder="10 KOLI"
-                className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
+              <div className="relative">
+                <input
+                  id={`dari-${item.id}`}
+                  type="text"
+                  value={item.dari}
+                  onFocus={onFocus}
+                  onChange={(e) => onChange({ dari: e.target.value })}
+                  placeholder="20"
+                  className="w-full rounded-lg border border-indigo-200 bg-white pl-3 pr-12 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                {(!item.dari.trim() || /^\d+$/.test(item.dari.trim())) && (
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-extrabold tracking-wider text-indigo-700">
+                    KOLI
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

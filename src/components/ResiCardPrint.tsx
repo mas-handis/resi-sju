@@ -10,10 +10,10 @@ interface ResiCardPrintProps {
 
 function getCodeFontSize(value: string): number {
   const len = value.trim().length;
-  if (len <= 3) return 40;
-  if (len <= 5) return 32;
-  if (len <= 7) return 24;
-  return 18;
+  if (len <= 3) return 38;
+  if (len <= 5) return 30;
+  if (len <= 7) return 22;
+  return 17;
 }
 
 function formatPhoneDisplay(raw: string): string {
@@ -24,8 +24,8 @@ function formatPhoneDisplay(raw: string): string {
   return `No. HP: ${trimmed}`;
 }
 
-const LEFT_LABEL_WIDTH = 68;
-const RIGHT_COL_WIDTH = 148;
+const LEFT_LABEL_WIDTH = 66;
+const RIGHT_COL_WIDTH = 144;
 
 export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   item,
@@ -40,9 +40,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   const hasBarang = item.namaBarang.trim().length > 0;
   const hasQty = item.qty.trim().length > 0;
 
-  // Detect "<number> KOLI" pattern in `dari` so we can render the number bold and "KOLI" cleanly underneath
+  // Detect "<number>" or "<number> KOLI" in `dari` so "KOLI" always renders automatically below the number
   const dariTrimmed = item.dari.trim();
-  const koliMatch = dariTrimmed.match(/^(\d+)\s+koli$/i);
+  const koliMatch = dariTrimmed.match(/^(\d+)(?:\s*koli)?$/i);
 
   // Refs for auto-fitting Kop Pengirim text lines cleanly
   const kopBoxRef = useRef<HTMLDivElement | null>(null);
@@ -151,10 +151,10 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     };
 
     if (hasBarang) {
-      fitSingleBox(barangBoxRef.current, barangTextRef.current, 11, 24, 8);
+      fitSingleBox(barangBoxRef.current, barangTextRef.current, 11, 24, 6);
     }
     if (hasQty) {
-      fitSingleBox(qtyBoxRef.current, qtyTextRef.current, 11, 24, 16);
+      fitSingleBox(qtyBoxRef.current, qtyTextRef.current, 11, 22, 16);
     }
   }, [item.namaBarang, item.qty, hasBarang, hasQty]);
 
@@ -176,7 +176,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       while (low <= high) {
         const mid = (low + high) / 2;
         el.style.fontSize = `${mid}px`;
-        if (el.scrollWidth <= availW - 2) {
+        if (el.scrollWidth <= availW) {
           best = mid;
           low = mid + 0.5;
         } else {
@@ -187,9 +187,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       el.style.fontSize = `${Math.floor(best * 10) / 10}px`;
     };
 
-    fitLineToWidth(kopTitleRef.current, 11, 19);
-    fitLineToWidth(kopAddrRef.current, 9.5, 14);
-    fitLineToWidth(kopContactRef.current, 8.5, 11.5);
+    fitLineToWidth(kopTitleRef.current, 12, 24);
+    fitLineToWidth(kopAddrRef.current, 10, 16.5);
+    fitLineToWidth(kopContactRef.current, 9, 13.5);
   }, [sender.title, sender.address, sender.phone, sender.email, sender.presetId, sender.logoDataUrl]);
 
   const hasContactLine = Boolean(sender.phone || sender.email);
@@ -269,15 +269,15 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 display: 'flex',
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: '10px',
-                padding: '7px 12px',
+                gap: '8px',
+                padding: '6px 10px',
               }}
             >
               <SuaraMuhammadiyahLogo
                 presetId={sender.presetId}
                 logoDataUrl={sender.logoDataUrl}
-                height={sender.presetId === 'sju' ? 36 : 48}
-                maxWidth={sender.presetId === 'sju' ? 168 : 120}
+                height={sender.presetId === 'sju' ? 36 : 46}
+                maxWidth={sender.presetId === 'sju' ? 160 : 112}
               />
               <div
                 style={{
@@ -295,17 +295,17 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                   flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
+                  alignItems: 'flex-start',
                   justifyContent: 'center',
-                  paddingBottom: '2px',
                 }}
               >
                 <div
                   ref={kopTitleRef}
                   style={{
-                    fontSize: '18px',
+                    fontSize: '21px',
                     fontWeight: 900,
-                    letterSpacing: '0.02em',
-                    lineHeight: 1.24,
+                    letterSpacing: '0.015em',
+                    lineHeight: 1.18,
                     color: '#000000',
                     whiteSpace: 'nowrap',
                   }}
@@ -315,9 +315,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 <div
                   ref={kopAddrRef}
                   style={{
-                    fontSize: '13.5px',
+                    fontSize: '15px',
                     fontWeight: 700,
-                    lineHeight: 1.28,
+                    lineHeight: 1.24,
                     color: '#111827',
                     whiteSpace: 'nowrap',
                   }}
@@ -328,9 +328,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                   <div
                     ref={kopContactRef}
                     style={{
-                      fontSize: '11px',
+                      fontSize: '11.5px',
                       fontWeight: 600,
-                      lineHeight: 1.3,
+                      lineHeight: 1.26,
                       color: '#374151',
                       whiteSpace: 'nowrap',
                     }}
@@ -507,15 +507,16 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '2px 6px 5px',
+                padding: '4px 6px',
               }}
             >
               {item.koliKe.trim() ? (
                 <span
                   style={{
+                    display: 'block',
                     fontSize: `${getCodeFontSize(item.koliKe)}px`,
                     fontWeight: 900,
-                    lineHeight: 1.05,
+                    lineHeight: 1,
                     color: '#000000',
                     fontVariantNumeric: 'tabular-nums',
                     textAlign: 'center',
@@ -561,7 +562,8 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '2px 6px 5px',
+                gap: '3px',
+                padding: '4px 6px',
               }}
             >
               {dariTrimmed ? (
@@ -569,9 +571,10 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                   <>
                     <span
                       style={{
+                        display: 'block',
                         fontSize: `${getCodeFontSize(koliMatch[1])}px`,
                         fontWeight: 900,
-                        lineHeight: 1,
+                        lineHeight: 0.95,
                         color: '#000000',
                         fontVariantNumeric: 'tabular-nums',
                         textAlign: 'center',
@@ -581,11 +584,13 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                     </span>
                     <span
                       style={{
+                        display: 'block',
                         fontSize: '10px',
                         fontWeight: 800,
+                        lineHeight: 1,
                         letterSpacing: '0.12em',
                         color: '#1F2937',
-                        marginTop: '2px',
+                        textAlign: 'center',
                       }}
                     >
                       KOLI
@@ -594,9 +599,10 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 ) : (
                   <span
                     style={{
+                      display: 'block',
                       fontSize: `${getCodeFontSize(dariTrimmed)}px`,
                       fontWeight: 900,
-                      lineHeight: 1.05,
+                      lineHeight: 1,
                       color: '#000000',
                       fontVariantNumeric: 'tabular-nums',
                       textAlign: 'center',
@@ -632,7 +638,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
             backgroundColor: '#FFEB00',
             WebkitPrintColorAdjust: 'exact',
             printColorAdjust: 'exact',
-            padding: '2px 12px 4px',
+            padding: '4px 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -649,7 +655,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 fontSize: '22px',
                 fontWeight: 900,
                 letterSpacing: '0.02em',
-                lineHeight: 1.2,
+                lineHeight: 1.15,
                 color: '#000000',
                 textTransform: 'uppercase',
                 textAlign: 'center',
@@ -687,11 +693,12 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
             backgroundColor: '#FFEB00',
             WebkitPrintColorAdjust: 'exact',
             printColorAdjust: 'exact',
-            padding: '2px 8px 4px',
+            padding: '3px 8px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: '2px',
             textAlign: 'center',
             overflow: 'hidden',
             boxSizing: 'border-box',
@@ -699,10 +706,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
         >
           <span
             style={{
+              display: 'block',
               fontSize: '9px',
               fontWeight: 800,
               letterSpacing: '0.1em',
-              lineHeight: 1.1,
+              lineHeight: 1,
               color: '#000000',
             }}
           >
@@ -716,7 +724,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 fontSize: '21px',
                 fontWeight: 900,
                 letterSpacing: '0.02em',
-                lineHeight: 1.1,
+                lineHeight: 1,
                 color: '#000000',
                 fontVariantNumeric: 'tabular-nums',
                 textAlign: 'center',

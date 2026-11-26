@@ -198,12 +198,11 @@ export function App() {
 
   const handleExport = async (type: 'pdf' | 'excel') => {
     if (exportingType) return;
-    if (type === 'pdf' && !exportRef.current) return;
     setExportingType(type);
     try {
       const result =
         type === 'pdf'
-          ? await downloadA4Pdf(exportRef.current!, sender.presetId)
+          ? await downloadA4Pdf(resiList, sender, showCutLines)
           : downloadResiExcel(resiList, sender);
       showToast(`Berhasil mengunduh ${result}`);
     } catch (err) {
