@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { A4_HEIGHT_MM, A4_PX_HEIGHT, A4_PX_WIDTH, A4_WIDTH_MM } from '../constants';
+import { SenderPresetId } from '../types';
 
 function buildTimestamp(): string {
   const now = new Date();
@@ -8,6 +9,10 @@ function buildTimestamp(): string {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(
     now.getHours()
   )}${pad(now.getMinutes())}`;
+}
+
+function getFilePrefix(presetId: SenderPresetId): string {
+  return presetId === 'sju' ? 'resi-sju-A4' : 'resi-suara-muhammadiyah-A4';
 }
 
 async function waitForImages(root: HTMLElement): Promise<void> {
@@ -28,16 +33,25 @@ async function waitForImages(root: HTMLElement): Promise<void> {
   );
 }
 
-async function renderSheetToDataUrl(element: HTMLElement): Promise<string> {
+function getPageElements(container: HTMLElement): HTMLElement[] {
+  const pages = Array.from(
+    container.querySelectorAll<HTMLElement>('[data-export-sheet="true"]')
+  );
+  return pages.length > 0 ? pages : [container];
+}
+
+async function renderPageToDataUrl(pageElement: HTMLElement): Promise<string> {
   if (document.fonts && document.fonts.ready) {
     await document.fonts.ready;
   }
 
-  await waitForImages(element);
+  await waitForImages(pageElement);
+
+  const pageNumber = pageElement.getAttribute('data-page-number');
 
   // Use html2canvas with scale: 3 on A4 (2382x3369px ≈ 8.0 MP, ~288 DPI)
   // for crisp print quality while staying safely under mobile Safari canvas limits.
-  const canvas = await html2canvas(element, {
+  const canvas = await html2canvas(pageElement, {
     scale: 3,
     useCORS: true,
     allowTaint: false,
@@ -50,11 +64,19 @@ async function renderSheetToDataUrl(element: HTMLElement): Promise<string> {
     scrollY: 0,
     logging: false,
     onclone: (clonedDoc) => {
-      const clonedSheet = clonedDoc.querySelector('[data-export-sheet="true"]') as HTMLElement | null;
-      if (clonedSheet && clonedSheet.parentElement) {
-        clonedSheet.parentElement.style.left = '0px';
-        clonedSheet.parentElement.style.top = '0px';
-        clonedSheet.parentElement.style.position = 'static';
+      const clonedOffscreen = clonedDoc.querySelector('.offscreen-print-sheet') as HTMLElement | null;
+      if (clonedOffscreen) {
+        clonedOffscreen.style.left = '0px';
+        clonedOffscreen.style.top = '0px';
+        clonedOffscreen.style.position = 'static';
+      }
+      if (pageNumber) {
+        const clonedPage = clonedDoc.querySelector(
+          `[data-export-sheet="true"][data-page-number="${pageNumber}"]`
+        ) as HTMLElement | null;
+        if (clonedPage) {
+          clonedPage.style.position = 'relative';
+        }
       }
     },
   });
@@ -62,23 +84,45 @@ async function renderSheetToDataUrl(element: HTMLElement): Promise<string> {
   return canvas.toDataURL('image/png');
 }
 
-export async function downloadA4Png(element: HTMLElement): Promise<string> {
-  const dataUrl = await renderSheetToDataUrl(element);
-  const filename = `resi-suara-muhammadiyah-A4-${buildTimestamp()}.png`;
-
+function triggerDownload(dataUrl: string, filename: string): void {
   const link = document.createElement('a');
   link.download = filename;
   link.href = dataUrl;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-
-  return filename;
 }
 
-export async function downloadA4Pdf(element: HTMLElement): Promise<string> {
-  const dataUrl = await renderSheetToDataUrl(element);
-  const filename = `resi-suara-muhammadiyah-A4-${buildTimestamp()}.pdf`;
+export async function downloadA4Png(
+  container: HTMLElement,
+  presetId: SenderPresetId
+): Promise<string> {
+  const pages = getPageElements(container);
+  const stamp = buildTimestamp();
+  const prefix = getFilePrefix(presetId);
+
+  if (pages.length === 1) {
+    const dataUrl = await renderPageToDataUrl(pages[0]);
+    const filename = `${prefix}-${stamp}.png`;
+    triggerDownload(dataUrl, filename);
+    return filename;
+  }
+
+  for (let i = 0; i < pages.length; i += 1) {
+    const dataUrl = await renderPageToDataUrl(pages[i]);
+    const filename = `${prefix}-${stamp}-hal${i + 1}.png`;
+    triggerDownload(dataUrl, filename);
+  }
+
+  return `${pages.length} file PNG (${prefix}-hal1..${pages.length})`;
+}
+
+export async function downloadA4Pdf(
+  container: HTMLElement,
+  presetId: SenderPresetId
+): Promise<string> {
+  const pages = getPageElements(container);
+  const filename = `${getFilePrefix(presetId)}-${buildTimestamp()}.pdf`;
 
   const pdf = new jsPDF({
     orientation: 'portrait',
@@ -87,7 +131,14 @@ export async function downloadA4Pdf(element: HTMLElement): Promise<string> {
     compress: true,
   });
 
-  pdf.addImage(dataUrl, 'PNG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, 'FAST');
+  for (let i = 0; i < pages.length; i += 1) {
+    if (i > 0) {
+      pdf.addPage('a4', 'portrait');
+    }
+    const dataUrl = await renderPageToDataUrl(pages[i]);
+    pdf.addImage(dataUrl, 'PNG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, 'FAST');
+  }
+
   pdf.save(filename);
 
   return filename;

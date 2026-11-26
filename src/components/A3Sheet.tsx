@@ -1,14 +1,15 @@
 import React from 'react';
-import { A4_PX_HEIGHT, A4_PX_WIDTH } from '../constants';
-import { GridCapacity, ResiItem, SenderHeader } from '../types';
+import { A4_PX_HEIGHT, A4_PX_WIDTH, RESI_PER_PAGE } from '../constants';
+import { ResiItem, SenderHeader } from '../types';
 import { ResiCardPrint } from './ResiCardPrint';
 
 interface A3SheetProps {
   items: ResiItem[];
   sender: SenderHeader;
-  gridCapacity: GridCapacity;
   showCutLines: boolean;
   isExport?: boolean;
+  pageNumber?: number;
+  startIndex?: number;
   activeResiId?: string | null;
   onSelectSlot?: (id: string) => void;
 }
@@ -18,9 +19,10 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
     {
       items,
       sender,
-      gridCapacity,
       showCutLines,
       isExport = false,
+      pageNumber = 1,
+      startIndex = 0,
       activeResiId,
       onSelectSlot,
     },
@@ -30,14 +32,15 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
     const horizontalMarginPx = 28;
     const verticalMarginPx = 22;
     const usableHeightPx = A4_PX_HEIGHT - verticalMarginPx * 2;
-    const slotHeightPx = usableHeightPx / gridCapacity;
+    const slotHeightPx = usableHeightPx / RESI_PER_PAGE;
 
-    const slots = Array.from({ length: gridCapacity }, (_, index) => items[index] ?? null);
+    const slots = Array.from({ length: RESI_PER_PAGE }, (_, index) => items[index] ?? null);
 
     return (
       <div
         ref={ref}
         data-export-sheet={isExport ? 'true' : undefined}
+        data-page-number={pageNumber}
         style={{
           width: `${A4_PX_WIDTH}px`,
           height: `${A4_PX_HEIGHT}px`,
@@ -51,7 +54,7 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
         }}
       >
         {slots.map((item, index) => {
-          const isLastSlot = index === gridCapacity - 1;
+          const isLastSlot = index === RESI_PER_PAGE - 1;
           const isSelected = !isExport && item && activeResiId === item.id;
           // In export mode, only show cut line after a filled resi (if not the very last slot)
           const renderCutLine =
@@ -61,7 +64,7 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
 
           return (
             <div
-              key={item ? item.id : `empty-slot-${index}`}
+              key={item ? item.id : `empty-slot-${pageNumber}-${index}`}
               style={{
                 height: `${slotHeightPx}px`,
                 width: '100%',
@@ -93,7 +96,6 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
                   <ResiCardPrint
                     item={item}
                     sender={sender}
-                    gridCapacity={gridCapacity}
                     isExport={isExport}
                   />
                 </div>
@@ -113,7 +115,7 @@ export const A3Sheet = React.forwardRef<HTMLDivElement, A3SheetProps>(
                     letterSpacing: '0.01em',
                   }}
                 >
-                  Slot Resi #{index + 1} (Kosong — tidak tercetak)
+                  Slot Resi #{startIndex + index + 1} (Kosong — tidak tercetak)
                 </div>
               ) : (
                 <div style={{ flex: 1 }} />

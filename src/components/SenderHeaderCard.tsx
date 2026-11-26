@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Lock, Pencil, RotateCcw, Upload, X } from 'lucide-react';
-import { DEFAULT_SENDER_HEADER } from '../constants';
-import { SenderHeader } from '../types';
+import { Building2, Lock, Pencil, RotateCcw, Upload, X } from 'lucide-react';
+import { SENDER_PRESETS } from '../constants';
+import { SenderHeader, SenderPresetId } from '../types';
 import { SuaraMuhammadiyahLogo } from './SuaraMuhammadiyahLogo';
 
 interface SenderHeaderCardProps {
@@ -9,9 +9,19 @@ interface SenderHeaderCardProps {
   onChange: (next: SenderHeader) => void;
 }
 
+const PRESET_OPTIONS: { id: SenderPresetId; label: string; shortLabel: string }[] = [
+  { id: 'sm', label: 'Suara Muhammadiyah', shortLabel: 'Suara Muhammadiyah' },
+  { id: 'sju', label: 'Surya Jaya Utomo (SJU)', shortLabel: 'SJU' },
+];
+
 export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleSelectPreset = (presetId: SenderPresetId) => {
+    onChange({ ...SENDER_PRESETS[presetId] });
+    setIsEditing(false);
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,7 +46,7 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onCh
             Kop Pengirim
           </span>
           <span className="inline-flex items-center rounded-full bg-emerald-600/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-            Otomatis
+            2 Opsi
           </span>
         </div>
         <button
@@ -58,13 +68,51 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onCh
         </button>
       </div>
 
+      {/* 2-Option Kop Pengirim Switcher (SM vs SJU) */}
+      <div className="px-3.5 pt-3 pb-2 bg-emerald-50/30 border-b border-emerald-100">
+        <div
+          className="grid grid-cols-2 gap-1.5 rounded-lg bg-emerald-100/70 p-1"
+          role="group"
+          aria-label="Pilih Kop Pengirim"
+        >
+          {PRESET_OPTIONS.map((opt) => {
+            const active = sender.presetId === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleSelectPreset(opt.id)}
+                className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold transition-all ${
+                  active
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-emerald-900 hover:bg-white/70'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {!isEditing ? (
         <div className="p-3.5 flex items-center gap-3">
-          <SuaraMuhammadiyahLogo logoDataUrl={sender.logoDataUrl} height={36} />
+          <SuaraMuhammadiyahLogo
+            presetId={sender.presetId}
+            logoDataUrl={sender.logoDataUrl}
+            height={sender.presetId === 'sju' ? 30 : 38}
+            maxWidth={sender.presetId === 'sju' ? 145 : 110}
+          />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-slate-800 truncate">{sender.address}</p>
-            <p className="text-[11px] text-slate-400 truncate mt-0.5">
-              Telp. {sender.phone} • {sender.email}
+            <p className="text-xs font-bold text-slate-900 truncate">{sender.title}</p>
+            <p className="text-[11px] font-medium text-slate-600 truncate mt-0.5">
+              {sender.address}
+            </p>
+            <p className="text-[11px] text-slate-400 truncate">
+              {sender.phone ? `Telp. ${sender.phone}` : ''}
+              {sender.phone && sender.email ? ' • ' : ''}
+              {sender.email}
             </p>
           </div>
         </div>
@@ -72,7 +120,12 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onCh
         <div className="p-4 space-y-3 bg-slate-50/40">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <SuaraMuhammadiyahLogo logoDataUrl={sender.logoDataUrl} height={34} />
+              <SuaraMuhammadiyahLogo
+                presetId={sender.presetId}
+                logoDataUrl={sender.logoDataUrl}
+                height={32}
+                maxWidth={130}
+              />
               <div className="flex items-center gap-1.5">
                 <input
                   ref={fileInputRef}
@@ -102,9 +155,9 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onCh
             </div>
             <button
               type="button"
-              onClick={() => onChange(DEFAULT_SENDER_HEADER)}
+              onClick={() => onChange({ ...SENDER_PRESETS[sender.presetId] })}
               className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
-              title="Kembalikan ke default Suara Muhammadiyah"
+              title="Kembalikan ke default pilihan kop ini"
             >
               <RotateCcw className="w-3 h-3" />
               Default
@@ -137,7 +190,7 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onCh
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Telepon
+                  Telepon / HP
                 </label>
                 <input
                   type="text"
@@ -148,7 +201,7 @@ export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onCh
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Email
+                  Email (Opsional)
                 </label>
                 <input
                   type="text"

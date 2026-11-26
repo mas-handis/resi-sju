@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
   Copy,
   Hash,
+  Layers,
   MapPin,
   Package,
   Phone,
   Plus,
   Trash2,
+  Zap,
 } from 'lucide-react';
 import { ResiItem } from '../types';
 
@@ -16,12 +18,12 @@ interface ResiFormCardProps {
   item: ResiItem;
   index: number;
   total: number;
-  canDuplicate: boolean;
   isActive: boolean;
   koliInputRef?: (el: HTMLInputElement | null) => void;
   onFocus: () => void;
   onChange: (patch: Partial<ResiItem>) => void;
   onDuplicate: () => void;
+  onAutoGenerateKoli: (totalKoli: number) => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -69,17 +71,26 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
   item,
   index,
   total,
-  canDuplicate,
   isActive,
   koliInputRef,
   onFocus,
   onChange,
   onDuplicate,
+  onAutoGenerateKoli,
   onDelete,
   onMoveUp,
   onMoveDown,
 }) => {
   const theme = CARD_THEMES[index % CARD_THEMES.length];
+  const [batchKoliInput, setBatchKoliInput] = useState<string>(() => {
+    const match = item.dari.match(/\d+/);
+    const num = match ? Number.parseInt(match[0], 10) : 10;
+    return num >= 2 && num <= 100 ? String(num) : '10';
+  });
+
+  const parsedBatchCount = Number.parseInt(batchKoliInput, 10);
+  const validBatchCount =
+    !Number.isNaN(parsedBatchCount) && parsedBatchCount >= 2 && parsedBatchCount <= 100;
 
   const handleIncrementKoli = () => {
     const trimmed = item.koliKe.trim();
@@ -113,6 +124,9 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
           </span>
           <span className={`text-sm font-bold truncate ${theme.titleText}`}>
             Resi #{index + 1}
+          </span>
+          <span className="text-[11px] font-medium text-slate-500 flex-shrink-0">
+            • Hal. {Math.floor(index / 4) + 1}
           </span>
         </div>
 
@@ -152,13 +166,8 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
               e.stopPropagation();
               onDuplicate();
             }}
-            disabled={!canDuplicate}
-            title={
-              canDuplicate
-                ? 'Duplikat data resi ini (cocok jika tujuan sama, hanya beda Koli Ke)'
-                : 'Kapasitas halaman A4 sudah penuh'
-            }
-            className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100 hover:border-sky-300 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            title="Duplikat data resi ini (halaman A4 akan bertambah otomatis bila perlu)"
+            className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100 hover:border-sky-300 transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />
             <span>Duplikat</span>
@@ -229,7 +238,7 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
           </div>
         </div>
 
-        {/* Group 2: Baris Kuning Resi (Kuning/Amber agar serasi dengan hasil cetak) */}
+        {/* Group 2: Baris Kuning Resi (Pesanan & QTY) */}
         <div className="rounded-xl bg-amber-50/90 border border-amber-300/80 p-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
@@ -259,22 +268,22 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label
-                  htmlFor={`catatan-kanan-${item.id}`}
+                  htmlFor={`qty-${item.id}`}
                   className="block text-xs font-bold text-amber-950"
                 >
-                  Nomor Pojok
+                  QTY
                 </label>
                 <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold bg-[#FFEB00] text-slate-900 border border-amber-500/60">
                   Kuning
                 </span>
               </div>
               <input
-                id={`catatan-kanan-${item.id}`}
+                id={`qty-${item.id}`}
                 type="text"
                 inputMode="numeric"
-                value={item.catatanKanan}
+                value={item.qty}
                 onFocus={onFocus}
-                onChange={(e) => onChange({ catatanKanan: e.target.value.replace(/[^\d]/g, '') })}
+                onChange={(e) => onChange({ qty: e.target.value.replace(/[^\d]/g, '') })}
                 placeholder="12"
                 className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
               />
@@ -282,8 +291,8 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
           </div>
         </div>
 
-        {/* Group 3: Kotak Angka Kanan (Indigo Lembut) */}
-        <div className="rounded-xl bg-indigo-50/60 border border-indigo-200/80 p-3">
+        {/* Group 3: Kotak Angka Kanan + Generate Otomatis Banyak Koli */}
+        <div className="rounded-xl bg-indigo-50/60 border border-indigo-200/80 p-3 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label
@@ -302,7 +311,7 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                   value={item.koliKe}
                   onFocus={onFocus}
                   onChange={(e) => onChange({ koliKe: e.target.value })}
-                  placeholder="110"
+                  placeholder="1"
                   className="w-full min-w-0 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 <button
@@ -325,18 +334,66 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                 className="flex items-center gap-1 text-xs font-bold text-indigo-950 mb-1.5"
               >
                 <Hash className="w-3.5 h-3.5 text-indigo-600" />
-                Dari
+                Dari (Total Koli)
               </label>
               <input
                 id={`dari-${item.id}`}
                 type="text"
-                inputMode="numeric"
                 value={item.dari}
                 onFocus={onFocus}
                 onChange={(e) => onChange({ dari: e.target.value })}
-                placeholder="62"
+                placeholder="10 KOLI"
                 className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 tabular-nums placeholder:font-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
+            </div>
+          </div>
+
+          {/* Auto-Generate Koli 1 s/d N + Auto Multi-Page A4 */}
+          <div className="pt-2.5 border-t border-indigo-200/80">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-950">
+                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                Otomatis Banyak Koli
+              </span>
+              <span className="text-[10px] font-medium text-indigo-700">
+                Kertas A4 menyesuaikan otomatis
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-24 flex-shrink-0">
+                <input
+                  type="number"
+                  min={2}
+                  max={100}
+                  value={batchKoliInput}
+                  onClick={(e) => e.stopPropagation()}
+                  onFocus={onFocus}
+                  onChange={(e) => setBatchKoliInput(e.target.value)}
+                  aria-label="Jumlah total koli"
+                  className="w-full rounded-lg border border-indigo-200 bg-white pl-2.5 pr-7 py-1.5 text-xs font-bold text-slate-900 tabular-nums focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-400">
+                  koli
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={!validBatchCount}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (validBatchCount) {
+                    onAutoGenerateKoli(parsedBatchCount);
+                  }
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-45 disabled:pointer-events-none shadow-sm transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                {validBatchCount
+                  ? `Buat Otomatis 1–${parsedBatchCount} Koli (${Math.ceil(
+                      parsedBatchCount / 4
+                    )} Hal)`
+                  : 'Isi 2–100 Koli'}
+              </button>
             </div>
           </div>
         </div>

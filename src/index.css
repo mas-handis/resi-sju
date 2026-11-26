@@ -30,7 +30,7 @@
   background-color: #94a3b8;
 }
 
-/* Off-screen export target on screen, visible full-page on print */
+/* Off-screen export target on screen, visible multi-page stack on print */
 .offscreen-print-sheet {
   position: fixed;
   top: 0;
@@ -39,7 +39,7 @@
   z-index: -1;
 }
 
-/* Native A4 Portrait print support */
+/* Native A4 Portrait print support (supports multi-page A4) */
 @page {
   size: A4 portrait;
   margin: 0;
@@ -49,10 +49,10 @@
   html,
   body {
     width: 210mm !important;
-    height: 297mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     background: #ffffff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -60,7 +60,7 @@
 
   #root {
     width: 210mm !important;
-    height: 297mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -77,9 +77,8 @@
     left: auto !important;
     z-index: 10 !important;
     pointer-events: auto !important;
-    width: 794px !important;
-    height: 1123px !important;
-    zoom: 0.995;
+    width: 210mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
@@ -88,5 +87,21 @@
     opacity: 1 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  .print-page-wrapper {
+    width: 794px !important;
+    height: 1122px !important;
+    zoom: 0.995;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-page-wrapper:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
 }

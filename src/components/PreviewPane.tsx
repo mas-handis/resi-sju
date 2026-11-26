@@ -1,16 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Maximize2, Scissors, ZoomIn, ZoomOut } from 'lucide-react';
-import { A4_PX_HEIGHT, A4_PX_WIDTH } from '../constants';
-import { GridCapacity, ResiItem, SenderHeader } from '../types';
+import {
+  A4_PX_HEIGHT,
+  A4_PX_WIDTH,
+  paginateResiList,
+  RESI_PER_PAGE,
+} from '../constants';
+import { ResiItem, SenderHeader } from '../types';
 import { A3Sheet } from './A3Sheet';
 
 interface PreviewPaneProps {
   items: ResiItem[];
   sender: SenderHeader;
-  gridCapacity: GridCapacity;
   showCutLines: boolean;
   activeResiId: string | null;
-  onChangeGridCapacity: (capacity: GridCapacity) => void;
   onToggleCutLines: () => void;
   onSelectSlot: (id: string) => void;
 }
@@ -18,15 +21,13 @@ interface PreviewPaneProps {
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
   items,
   sender,
-  gridCapacity,
   showCutLines,
   activeResiId,
-  onChangeGridCapacity,
   onToggleCutLines,
   onSelectSlot,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [fitScale, setFitScale] = useState(0.45);
+  const [fitScale, setFitScale] = useState(0.55);
   const [zoomMultiplier, setZoomMultiplier] = useState(1);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
     const computeScale = () => {
       const rect = node.getBoundingClientRect();
       const padX = 40;
-      const padY = 40;
+      const padY = 48;
       const availW = Math.max(rect.width - padX, 240);
       const availH = Math.max(rect.height - padY, 320);
 
@@ -55,6 +56,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   const effectiveScale = fitScale * zoomMultiplier;
   const scaledWidth = A4_PX_WIDTH * effectiveScale;
   const scaledHeight = A4_PX_HEIGHT * effectiveScale;
+  const pages = paginateResiList(items);
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-200/90 via-sky-100/70 to-emerald-100/60">
@@ -65,36 +67,14 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
             Live Preview A4
           </span>
           <span className="hidden sm:inline-flex items-center rounded-md bg-sky-50 border border-sky-200 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
-            210 × 297 mm • Portrait
+            210 × 297 mm • 4 Resi/Hal
+          </span>
+          <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+            {pages.length} Halaman
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* 4 or 5 Resi Grid Toggle */}
-          <div
-            className="inline-flex rounded-lg border border-indigo-200 bg-indigo-50/70 p-0.5"
-            role="group"
-            aria-label="Kapasitas grid per halaman A4"
-          >
-            {([5, 4] as GridCapacity[]).map((cap) => {
-              const active = gridCapacity === cap;
-              return (
-                <button
-                  key={cap}
-                  type="button"
-                  onClick={() => onChangeGridCapacity(cap)}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-                    active
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-indigo-700 hover:bg-indigo-100/80'
-                  }`}
-                >
-                  {cap} Resi
-                </button>
-              );
-            })}
-          </div>
-
           {/* Cut lines toggle */}
           <button
             type="button"
@@ -141,39 +121,62 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
         </div>
       </div>
 
-      {/* Scaled A4 Paper Viewport */}
+      {/* Multi-Page Scaled A4 Paper Viewport */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto custom-scrollbar flex items-start justify-center p-5"
+        className="flex-1 overflow-auto custom-scrollbar flex flex-col items-center gap-6 p-5"
       >
-        <div
-          style={{
-            width: `${scaledWidth}px`,
-            height: `${scaledHeight}px`,
-            flexShrink: 0,
-            position: 'relative',
-          }}
-          className="rounded-sm bg-white shadow-[0_12px_36px_rgba(15,23,42,0.16)] ring-1 ring-slate-900/10"
-        >
-          <div
-            style={{
-              width: `${A4_PX_WIDTH}px`,
-              height: `${A4_PX_HEIGHT}px`,
-              transform: `scale(${effectiveScale})`,
-              transformOrigin: 'top left',
-            }}
-          >
-            <A3Sheet
-              items={items}
-              sender={sender}
-              gridCapacity={gridCapacity}
-              showCutLines={showCutLines}
-              isExport={false}
-              activeResiId={activeResiId}
-              onSelectSlot={onSelectSlot}
-            />
-          </div>
-        </div>
+        {pages.map((pageItems, pageIdx) => {
+          const startIdx = pageIdx * RESI_PER_PAGE;
+          const endIdx = startIdx + pageItems.length;
+
+          return (
+            <div key={`preview-page-${pageIdx}`} className="flex flex-col items-center gap-2">
+              {pages.length > 1 && (
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold text-slate-700 shadow-sm ring-1 ring-slate-900/10">
+                  <span>
+                    Halaman {pageIdx + 1} dari {pages.length}
+                  </span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-indigo-700">
+                    Resi #{startIdx + 1}
+                    {endIdx > startIdx + 1 ? `–#${endIdx}` : ''}
+                  </span>
+                </div>
+              )}
+
+              <div
+                style={{
+                  width: `${scaledWidth}px`,
+                  height: `${scaledHeight}px`,
+                  flexShrink: 0,
+                  position: 'relative',
+                }}
+                className="rounded-sm bg-white shadow-[0_12px_36px_rgba(15,23,42,0.16)] ring-1 ring-slate-900/10"
+              >
+                <div
+                  style={{
+                    width: `${A4_PX_WIDTH}px`,
+                    height: `${A4_PX_HEIGHT}px`,
+                    transform: `scale(${effectiveScale})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  <A3Sheet
+                    items={pageItems}
+                    sender={sender}
+                    showCutLines={showCutLines}
+                    isExport={false}
+                    pageNumber={pageIdx + 1}
+                    startIndex={startIdx}
+                    activeResiId={activeResiId}
+                    onSelectSlot={onSelectSlot}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

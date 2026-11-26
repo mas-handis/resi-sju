@@ -1,20 +1,19 @@
 import React, { useLayoutEffect, useRef } from 'react';
-import { GridCapacity, ResiItem, SenderHeader } from '../types';
+import { ResiItem, SenderHeader } from '../types';
 import { SuaraMuhammadiyahLogo } from './SuaraMuhammadiyahLogo';
 
 interface ResiCardPrintProps {
   item: ResiItem;
   sender: SenderHeader;
-  gridCapacity: GridCapacity;
   isExport?: boolean;
 }
 
-function getCodeFontSize(value: string, isFourRow: boolean): number {
+function getCodeFontSize(value: string): number {
   const len = value.trim().length;
-  if (len <= 3) return isFourRow ? 40 : 34;
-  if (len <= 5) return isFourRow ? 32 : 26;
-  if (len <= 7) return isFourRow ? 24 : 20;
-  return isFourRow ? 18 : 15;
+  if (len <= 3) return 40;
+  if (len <= 5) return 32;
+  if (len <= 7) return 24;
+  return 18;
 }
 
 function formatPhoneDisplay(raw: string): string {
@@ -25,25 +24,27 @@ function formatPhoneDisplay(raw: string): string {
   return `No. HP: ${trimmed}`;
 }
 
+const LEFT_LABEL_WIDTH = 68;
 const RIGHT_COL_WIDTH = 148;
 
 export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   item,
   sender,
-  gridCapacity,
   isExport = false,
 }) => {
-  const isFourRow = gridCapacity === 4;
-
   const kepadaLines = item.kepada.split('\n');
   const firstLine = kepadaLines[0] ?? '';
   const restLines = kepadaLines.slice(1).join('\n');
   const hasKepada = item.kepada.trim().length > 0;
   const hasNoHp = item.noHp.trim().length > 0;
   const hasBarang = item.namaBarang.trim().length > 0;
-  const hasCatatanKanan = item.catatanKanan.trim().length > 0;
+  const hasQty = item.qty.trim().length > 0;
 
-  // Refs for auto-fitting Kop Pengirim text lines to fill column width cleanly
+  // Detect "<number> KOLI" pattern in `dari` so we can render the number bold and "KOLI" cleanly underneath
+  const dariTrimmed = item.dari.trim();
+  const koliMatch = dariTrimmed.match(/^(\d+)\s+koli$/i);
+
+  // Refs for auto-fitting Kop Pengirim text lines cleanly
   const kopBoxRef = useRef<HTMLDivElement | null>(null);
   const kopTitleRef = useRef<HTMLDivElement | null>(null);
   const kopAddrRef = useRef<HTMLDivElement | null>(null);
@@ -56,11 +57,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
   const restLinesRef = useRef<HTMLDivElement | null>(null);
   const noHpRef = useRef<HTMLDivElement | null>(null);
 
-  // Refs for auto-fitting yellow bottom bars (Pesanan & Nomor Pojok)
+  // Refs for auto-fitting yellow bottom bars (Pesanan & QTY)
   const barangBoxRef = useRef<HTMLDivElement | null>(null);
   const barangTextRef = useRef<HTMLDivElement | null>(null);
-  const kananBoxRef = useRef<HTMLDivElement | null>(null);
-  const kananTextRef = useRef<HTMLDivElement | null>(null);
+  const qtyBoxRef = useRef<HTMLDivElement | null>(null);
+  const qtyTextRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
     const box = kepadaBoxRef.current;
@@ -90,7 +91,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     };
 
     const minSize = 10;
-    const maxSize = isFourRow ? 34 : 28;
+    const maxSize = 32;
 
     let low = minSize;
     let high = maxSize;
@@ -100,7 +101,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       const mid = Math.floor((low + high) / 2);
       applySize(mid);
 
-      // Leave a generous 10px vertical safety buffer so descenders never clip in html2canvas/print
+      // Leave a 10px vertical safety buffer so descenders never clip in html2canvas/print
       const fitsHeight = content.scrollHeight <= availH - 10;
       const fitsWidth = content.scrollWidth <= availW;
 
@@ -113,20 +114,21 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     }
 
     applySize(best);
-  }, [item.kepada, item.noHp, gridCapacity, hasKepada, hasNoHp, isFourRow]);
+  }, [item.kepada, item.noHp, hasKepada, hasNoHp, sender.presetId, sender.logoDataUrl]);
 
   useLayoutEffect(() => {
     const fitSingleBox = (
       box: HTMLDivElement | null,
       textEl: HTMLDivElement | null,
       minSize: number,
-      maxSize: number
+      maxSize: number,
+      extraReserveH = 8
     ) => {
       if (!box || !textEl) return;
       const style = getComputedStyle(box);
       const padH = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
       const padW = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-      const availH = box.clientHeight - padH - 8;
+      const availH = box.clientHeight - padH - extraReserveH;
       const availW = box.clientWidth - padW;
       if (availH <= 0 || availW <= 0) return;
 
@@ -149,12 +151,12 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
     };
 
     if (hasBarang) {
-      fitSingleBox(barangBoxRef.current, barangTextRef.current, 11, isFourRow ? 24 : 20);
+      fitSingleBox(barangBoxRef.current, barangTextRef.current, 11, 24, 8);
     }
-    if (hasCatatanKanan) {
-      fitSingleBox(kananBoxRef.current, kananTextRef.current, 11, isFourRow ? 24 : 20);
+    if (hasQty) {
+      fitSingleBox(qtyBoxRef.current, qtyTextRef.current, 11, 24, 16);
     }
-  }, [item.namaBarang, item.catatanKanan, gridCapacity, hasBarang, hasCatatanKanan, isFourRow]);
+  }, [item.namaBarang, item.qty, hasBarang, hasQty]);
 
   useLayoutEffect(() => {
     const box = kopBoxRef.current;
@@ -185,10 +187,12 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
       el.style.fontSize = `${Math.floor(best * 10) / 10}px`;
     };
 
-    fitLineToWidth(kopTitleRef.current, 11, isFourRow ? 16 : 14.5);
-    fitLineToWidth(kopAddrRef.current, 9.5, isFourRow ? 12 : 10.8);
-    fitLineToWidth(kopContactRef.current, 8.5, isFourRow ? 10 : 9.2);
-  }, [sender.title, sender.address, sender.phone, sender.email, sender.logoDataUrl, gridCapacity, isFourRow]);
+    fitLineToWidth(kopTitleRef.current, 11, 19);
+    fitLineToWidth(kopAddrRef.current, 9.5, 14);
+    fitLineToWidth(kopContactRef.current, 8.5, 11.5);
+  }, [sender.title, sender.address, sender.phone, sender.email, sender.presetId, sender.logoDataUrl]);
+
+  const hasContactLine = Boolean(sender.phone || sender.email);
 
   return (
     <div
@@ -205,7 +209,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
         overflow: 'hidden',
       }}
     >
-      {/* Upper Main Body: Left (Kop + Kepada + No HP) & Right Corner (Row 1: KOLI KE, Row 2: DARI) */}
+      {/* Upper Main Body: Left ([DARI | Kop] + [KEPADA | Recipient]) & Right Corner ([KOLI KE] + [DARI]) */}
       <div
         style={{
           flex: 1,
@@ -214,7 +218,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
           flexDirection: 'row',
         }}
       >
-        {/* Left Section: Kop Pengirim + Kepada */}
+        {/* Left Section */}
         <div
           style={{
             flex: 1,
@@ -223,86 +227,124 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
             flexDirection: 'column',
           }}
         >
-          {/* Kop Pengirim */}
+          {/* Row 1: Kolom Kiri "DARI" + Logo & Kop Pengirim */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'row',
-              alignItems: 'center',
-              gap: '10px',
-              padding: isFourRow ? '7px 12px' : '6px 10px',
+              alignItems: 'stretch',
               borderBottom: '1.5px solid #000000',
               backgroundColor: '#FFFFFF',
               flexShrink: 0,
             }}
           >
-            <SuaraMuhammadiyahLogo
-              logoDataUrl={sender.logoDataUrl}
-              height={isFourRow ? 42 : 35}
-            />
+            {/* Left Label Column: DARI */}
             <div
               style={{
-                width: '1.5px',
-                alignSelf: 'stretch',
-                backgroundColor: '#D1D5DB',
-                margin: '1px 0',
+                width: `${LEFT_LABEL_WIDTH}px`,
                 flexShrink: 0,
-              }}
-            />
-            <div
-              ref={kopBoxRef}
-              style={{
-                minWidth: 0,
-                flex: 1,
+                borderRight: '1.5px solid #000000',
+                backgroundColor: '#F3F4F6',
+                WebkitPrintColorAdjust: 'exact',
+                printColorAdjust: 'exact',
                 display: 'flex',
-                flexDirection: 'column',
+                alignItems: 'center',
                 justifyContent: 'center',
-                paddingBottom: '2px',
+                padding: '4px 6px',
+                fontSize: '12px',
+                fontWeight: 800,
+                letterSpacing: '0.05em',
+                color: '#111827',
+                boxSizing: 'border-box',
               }}
             >
+              DARI
+            </div>
+
+            {/* Logo + Kop Details */}
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '7px 12px',
+              }}
+            >
+              <SuaraMuhammadiyahLogo
+                presetId={sender.presetId}
+                logoDataUrl={sender.logoDataUrl}
+                height={sender.presetId === 'sju' ? 36 : 48}
+                maxWidth={sender.presetId === 'sju' ? 168 : 120}
+              />
               <div
-                ref={kopTitleRef}
                 style={{
-                  fontSize: isFourRow ? '16px' : '14.5px',
-                  fontWeight: 900,
-                  letterSpacing: '0.03em',
-                  lineHeight: 1.25,
-                  color: '#000000',
-                  whiteSpace: 'nowrap',
+                  width: '1.5px',
+                  alignSelf: 'stretch',
+                  backgroundColor: '#D1D5DB',
+                  margin: '1px 0',
+                  flexShrink: 0,
+                }}
+              />
+              <div
+                ref={kopBoxRef}
+                style={{
+                  minWidth: 0,
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  paddingBottom: '2px',
                 }}
               >
-                {sender.title}
-              </div>
-              <div
-                ref={kopAddrRef}
-                style={{
-                  fontSize: isFourRow ? '12px' : '10.8px',
-                  fontWeight: 700,
-                  lineHeight: 1.3,
-                  color: '#111827',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {sender.address}
-              </div>
-              <div
-                ref={kopContactRef}
-                style={{
-                  fontSize: isFourRow ? '10px' : '9.2px',
-                  fontWeight: 600,
-                  lineHeight: 1.32,
-                  color: '#374151',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {sender.phone ? `Telp. ${sender.phone}` : ''}
-                {sender.phone && sender.email ? ' | ' : ''}
-                {sender.email ? `Email: ${sender.email}` : ''}
+                <div
+                  ref={kopTitleRef}
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 900,
+                    letterSpacing: '0.02em',
+                    lineHeight: 1.24,
+                    color: '#000000',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {sender.title}
+                </div>
+                <div
+                  ref={kopAddrRef}
+                  style={{
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    lineHeight: 1.28,
+                    color: '#111827',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {sender.address}
+                </div>
+                {hasContactLine && (
+                  <div
+                    ref={kopContactRef}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      lineHeight: 1.3,
+                      color: '#374151',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {sender.phone ? `Telp. ${sender.phone}` : ''}
+                    {sender.phone && sender.email ? ' | ' : ''}
+                    {sender.email ? `Email: ${sender.email}` : ''}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Kepada (Penerima + Alamat + Nomor HP di bawah alamat, auto-fit hingga penuh) */}
+          {/* Row 2: Kolom Kiri "KEPADA" + Penerima & Alamat & No HP */}
           <div
             style={{
               flex: 1,
@@ -310,24 +352,32 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'stretch',
-              padding: isFourRow ? '8px 12px' : '6px 10px',
-              gap: '6px',
               overflow: 'hidden',
             }}
           >
+            {/* Left Label Column: KEPADA (aligned vertically with DARI above) */}
             <div
               style={{
-                width: '64px',
+                width: `${LEFT_LABEL_WIDTH}px`,
                 flexShrink: 0,
-                fontSize: isFourRow ? '12.5px' : '11.5px',
+                borderRight: '1.5px solid #000000',
+                backgroundColor: '#F3F4F6',
+                WebkitPrintColorAdjust: 'exact',
+                printColorAdjust: 'exact',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px',
+                fontSize: '12px',
                 fontWeight: 800,
-                letterSpacing: '0.03em',
+                letterSpacing: '0.04em',
                 color: '#111827',
-                paddingTop: '3px',
+                boxSizing: 'border-box',
               }}
             >
-              KEPADA :
+              KEPADA
             </div>
+
             <div
               ref={kepadaBoxRef}
               style={{
@@ -338,6 +388,8 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
+                padding: '6px 12px',
+                boxSizing: 'border-box',
               }}
             >
               {hasKepada || hasNoHp ? (
@@ -354,7 +406,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                       <div
                         ref={firstLineRef}
                         style={{
-                          fontSize: isFourRow ? '22px' : '19px',
+                          fontSize: '22px',
                           fontWeight: 800,
                           lineHeight: 1.24,
                           color: '#000000',
@@ -367,7 +419,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                         <div
                           ref={restLinesRef}
                           style={{
-                            fontSize: isFourRow ? '19px' : '16.5px',
+                            fontSize: '19px',
                             fontWeight: 700,
                             lineHeight: 1.28,
                             color: '#111827',
@@ -386,7 +438,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                     <div
                       ref={noHpRef}
                       style={{
-                        fontSize: isFourRow ? '19px' : '16.5px',
+                        fontSize: '19px',
                         fontWeight: 800,
                         lineHeight: 1.28,
                         color: '#000000',
@@ -401,7 +453,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               ) : !isExport ? (
                 <div
                   style={{
-                    fontSize: isFourRow ? '13.5px' : '12.5px',
+                    fontSize: '13.5px',
                     fontStyle: 'italic',
                     color: '#94A3B8',
                   }}
@@ -436,9 +488,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               style={{
                 borderBottom: '1px solid #000000',
                 backgroundColor: '#F3F4F6',
-                padding: isFourRow ? '4px 6px' : '3px 6px',
+                WebkitPrintColorAdjust: 'exact',
+                printColorAdjust: 'exact',
+                padding: '4px 6px',
                 textAlign: 'center',
-                fontSize: isFourRow ? '10.5px' : '9.5px',
+                fontSize: '10.5px',
                 fontWeight: 800,
                 letterSpacing: '0.09em',
                 color: '#000000',
@@ -459,7 +513,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               {item.koliKe.trim() ? (
                 <span
                   style={{
-                    fontSize: `${getCodeFontSize(item.koliKe, isFourRow)}px`,
+                    fontSize: `${getCodeFontSize(item.koliKe)}px`,
                     fontWeight: 900,
                     lineHeight: 1.05,
                     color: '#000000',
@@ -487,9 +541,11 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               style={{
                 borderBottom: '1px solid #000000',
                 backgroundColor: '#F3F4F6',
-                padding: isFourRow ? '4px 6px' : '3px 6px',
+                WebkitPrintColorAdjust: 'exact',
+                printColorAdjust: 'exact',
+                padding: '4px 6px',
                 textAlign: 'center',
-                fontSize: isFourRow ? '10.5px' : '9.5px',
+                fontSize: '10.5px',
                 fontWeight: 800,
                 letterSpacing: '0.09em',
                 color: '#000000',
@@ -502,24 +558,54 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               style={{
                 flex: 1,
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '2px 6px 5px',
               }}
             >
-              {item.dari.trim() ? (
-                <span
-                  style={{
-                    fontSize: `${getCodeFontSize(item.dari, isFourRow)}px`,
-                    fontWeight: 900,
-                    lineHeight: 1.05,
-                    color: '#000000',
-                    fontVariantNumeric: 'tabular-nums',
-                    textAlign: 'center',
-                  }}
-                >
-                  {item.dari}
-                </span>
+              {dariTrimmed ? (
+                koliMatch ? (
+                  <>
+                    <span
+                      style={{
+                        fontSize: `${getCodeFontSize(koliMatch[1])}px`,
+                        fontWeight: 900,
+                        lineHeight: 1,
+                        color: '#000000',
+                        fontVariantNumeric: 'tabular-nums',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {koliMatch[1]}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        letterSpacing: '0.12em',
+                        color: '#1F2937',
+                        marginTop: '2px',
+                      }}
+                    >
+                      KOLI
+                    </span>
+                  </>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: `${getCodeFontSize(dariTrimmed)}px`,
+                      fontWeight: 900,
+                      lineHeight: 1.05,
+                      color: '#000000',
+                      fontVariantNumeric: 'tabular-nums',
+                      textAlign: 'center',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {dariTrimmed}
+                  </span>
+                )
               ) : !isExport ? (
                 <span style={{ fontSize: '22px', fontWeight: 700, color: '#CBD5E1' }}>—</span>
               ) : null}
@@ -528,13 +614,13 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
         </div>
       </div>
 
-      {/* Bottom Row: Left = Pesanan (Yellow, Centered, Auto-fit), Right Corner Row 3 = Kolom Kuning (Nomor, Centered) */}
+      {/* Bottom Row: Left = Pesanan (Yellow, Centered), Right Corner Row 3 = QTY inside Yellow Box */}
       <div
         style={{
           borderTop: '1.5px solid #000000',
           display: 'flex',
           flexDirection: 'row',
-          height: isFourRow ? '48px' : '42px',
+          height: '48px',
           flexShrink: 0,
         }}
       >
@@ -560,7 +646,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
               ref={barangTextRef}
               style={{
                 width: '100%',
-                fontSize: isFourRow ? '22px' : '19px',
+                fontSize: '22px',
                 fontWeight: 900,
                 letterSpacing: '0.02em',
                 lineHeight: 1.2,
@@ -580,7 +666,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 opacity: 0.55,
                 fontWeight: 700,
                 fontStyle: 'italic',
-                fontSize: isFourRow ? '15px' : '14px',
+                fontSize: '15px',
                 textAlign: 'center',
               }}
             >
@@ -591,9 +677,9 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
           )}
         </div>
 
-        {/* Corner Row 3: Yellow cell beside pesanan */}
+        {/* Corner Row 3: QTY inside yellow box */}
         <div
-          ref={kananBoxRef}
+          ref={qtyBoxRef}
           style={{
             width: `${RIGHT_COL_WIDTH}px`,
             flexShrink: 0,
@@ -603,6 +689,7 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
             printColorAdjust: 'exact',
             padding: '2px 8px 4px',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             textAlign: 'center',
@@ -610,22 +697,33 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
             boxSizing: 'border-box',
           }}
         >
-          {hasCatatanKanan ? (
+          <span
+            style={{
+              fontSize: '9px',
+              fontWeight: 800,
+              letterSpacing: '0.1em',
+              lineHeight: 1.1,
+              color: '#000000',
+            }}
+          >
+            QTY
+          </span>
+          {hasQty ? (
             <div
-              ref={kananTextRef}
+              ref={qtyTextRef}
               style={{
                 width: '100%',
-                fontSize: isFourRow ? '22px' : '19px',
+                fontSize: '21px',
                 fontWeight: 900,
                 letterSpacing: '0.02em',
-                lineHeight: 1.2,
+                lineHeight: 1.1,
                 color: '#000000',
                 fontVariantNumeric: 'tabular-nums',
                 textAlign: 'center',
                 wordBreak: 'break-word',
               }}
             >
-              {item.catatanKanan}
+              {item.qty}
             </div>
           ) : !isExport ? (
             <span
@@ -634,13 +732,14 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                 opacity: 0.5,
                 fontWeight: 700,
                 fontStyle: 'italic',
-                fontSize: '12px',
+                fontSize: '13px',
+                lineHeight: 1.1,
               }}
             >
               —
             </span>
           ) : (
-            '\u00A0'
+            <span style={{ lineHeight: 1.1 }}>{'\u00A0'}</span>
           )}
         </div>
       </div>
