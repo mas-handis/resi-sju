@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
 import {
   CheckCircle2,
+  ClipboardList,
   Eye,
   FileDown,
   FileSpreadsheet,
   FileText,
   Loader2,
+  Package,
   Plus,
   Printer,
   RotateCcw,
@@ -16,17 +18,25 @@ import { A3Sheet } from './components/A3Sheet';
 import { PreviewPane } from './components/PreviewPane';
 import { ResiFormCard } from './components/ResiFormCard';
 import { SenderHeaderCard } from './components/SenderHeaderCard';
+import { SuratJalanForm } from './components/SuratJalanForm';
+import { SuratJalanPreviewPane } from './components/SuratJalanPreviewPane';
+import { SuratJalanSheet } from './components/SuratJalanSheet';
 import {
   createEmptyResi,
+  createEmptySuratJalan,
   createSampleResiList,
+  createSampleSuratJalan,
   DEFAULT_SENDER_HEADER,
+  getResiBottomRows,
   isResiFilled,
   paginateResiList,
   RESI_PER_PAGE,
+  SURAT_JALAN_SENDER_PRESETS,
 } from './constants';
-import { ResiItem, SenderHeader } from './types';
-import { downloadResiExcel } from './utils/exportExcel';
+import { AppMode, ResiItem, SenderHeader, SuratJalanData } from './types';
+import { downloadResiExcel, downloadSuratJalanExcel } from './utils/exportExcel';
 import { downloadA4Pdf } from './utils/exportSheet';
+import { downloadSuratJalanPdf } from './utils/exportSuratJalanPdf';
 
 interface ToastState {
   message: string;
@@ -34,8 +44,13 @@ interface ToastState {
 }
 
 export function App() {
+  const [appMode, setAppMode] = useState<AppMode>('resi');
   const [sender, setSender] = useState<SenderHeader>(DEFAULT_SENDER_HEADER);
   const [resiList, setResiList] = useState<ResiItem[]>(() => [createEmptyResi()]);
+  const [sjSender, setSjSender] = useState<SenderHeader>(SURAT_JALAN_SENDER_PRESETS.sm);
+  const [suratJalan, setSuratJalan] = useState<SuratJalanData>(() =>
+    createEmptySuratJalan('sm')
+  );
   const [showCutLines, setShowCutLines] = useState<boolean>(true);
   const [activeResiId, setActiveResiId] = useState<string | null>(() => resiList[0]?.id ?? null);
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
@@ -167,6 +182,11 @@ export function App() {
   };
 
   const handleClearAll = () => {
+    if (appMode === 'surat_jalan') {
+      setSuratJalan(createEmptySuratJalan(sjSender.presetId));
+      showToast('Formulir Surat Jalan dibersihkan.');
+      return;
+    }
     const previous = resiList;
     const hasContent = previous.some(isResiFilled);
     const fresh = createEmptyResi();
@@ -178,10 +198,48 @@ export function App() {
   };
 
   const handleLoadSample = () => {
+    if (appMode === 'surat_jalan') {
+      setSuratJalan(createSampleSuratJalan(sjSender.presetId));
+      showToast(
+        `Contoh Surat Jalan ${
+          sjSender.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah'
+        } dimuat.`
+      );
+      return;
+    }
     const samples = createSampleResiList();
     setResiList(samples);
     setActiveResiId(samples[0]?.id ?? null);
     showToast(`Contoh ${samples.length} resi TK ABA dimuat.`);
+  };
+
+  const handleCopyFromResiToSuratJalan = () => {
+    const first = resiList[0];
+    if (!first) return;
+    const lines = first.kepada
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const penerima = lines[0] ?? '';
+    const alamat = lines.slice(1).join('\n');
+    const bottomRows = getResiBottomRows(first);
+    const totalKoliMatch = first.dari.trim().match(/^(\d+)/);
+    const defaultKoli = totalKoliMatch ? totalKoliMatch[1] : '';
+
+    setSuratJalan((prev) => ({
+      ...prev,
+      kepada: penerima || prev.kepada,
+      alamat: alamat || prev.alamat,
+      telepon: first.noHp.trim() || prev.telepon,
+      rows: bottomRows.map((row, idx) => ({
+        id: crypto.randomUUID(),
+        namaBarang: row.namaBarang,
+        qty: row.qty,
+        jumlahKoli: idx === 0 ? defaultKoli : '',
+        keterangan: '',
+      })),
+    }));
+    showToast('Data tujuan & barang disalin dari Resi #1 ke Surat Jalan.');
   };
 
   const handleSelectSlot = (id: string) => {
@@ -196,10 +254,18 @@ export function App() {
     if (exportingType) return;
     setExportingType(type);
     try {
-      const result =
-        type === 'pdf'
-          ? await downloadA4Pdf(resiList, sender, showCutLines)
-          : downloadResiExcel(resiList, sender);
+      let result: string;
+      if (appMode === 'surat_jalan') {
+        result =
+          type === 'pdf'
+            ? await downloadSuratJalanPdf(suratJalan, sjSender, showCutLines)
+            : downloadSuratJalanExcel(suratJalan, sjSender);
+      } else {
+        result =
+          type === 'pdf'
+            ? await downloadA4Pdf(resiList, sender, showCutLines)
+            : downloadResiExcel(resiList, sender);
+      }
       showToast(`Berhasil mengunduh ${result}`);
     } catch (err) {
       console.error('Export failed:', err);
@@ -210,29 +276,72 @@ export function App() {
   };
 
   const filledCount = resiList.filter(isResiFilled).length;
-  const senderLabel = sender.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah';
+  const activeSender = appMode === 'surat_jalan' ? sjSender : sender;
+  const senderLabel = activeSender.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah';
 
   return (
     <>
       <div className="no-print min-h-screen lg:h-screen flex flex-col bg-slate-100 text-slate-900">
         {/* Top Application Header (Colorful & Clear Action Hierarchy) */}
-        <header className="sticky top-0 z-30 bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white shadow-md px-4 lg:px-6 py-3 flex items-center justify-between gap-3">
+        <header className="sticky top-0 z-30 bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white shadow-md px-4 lg:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-9 w-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center flex-shrink-0 shadow-sm">
-              <FileText className="w-4 h-4 stroke-[2.5]" />
+              {appMode === 'surat_jalan' ? (
+                <ClipboardList className="w-4 h-4 stroke-[2.5]" />
+              ) : (
+                <FileText className="w-4 h-4 stroke-[2.5]" />
+              )}
             </div>
             <div className="min-w-0">
               <h1 className="text-sm sm:text-base font-extrabold text-white leading-tight truncate tracking-wide">
-                RESI GENERATOR
+                {appMode === 'surat_jalan' ? 'SURAT JALAN GENERATOR' : 'RESI GENERATOR'}
               </h1>
               <p className="text-[11px] sm:text-xs text-emerald-100 truncate">
-                {senderLabel} • {resiList.length} resi ({pages.length} hal. A4)
+                {appMode === 'surat_jalan'
+                  ? `${senderLabel} • 2 Rangkap / Hal. A4 (Copy & Asli)`
+                  : `${senderLabel} • ${resiList.length} resi (${pages.length} hal. A4)`}
               </p>
             </div>
           </div>
 
+          {/* Mode Switcher: Resi Pengiriman vs Surat Jalan */}
+          <div
+            className="order-3 sm:order-2 w-full sm:w-auto flex items-center rounded-xl bg-emerald-950/45 p-1 border border-white/15"
+            role="tablist"
+            aria-label="Pilih Jenis Dokumen"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={appMode === 'resi'}
+              onClick={() => setAppMode('resi')}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                appMode === 'resi'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Package className="w-3.5 h-3.5" />
+              Resi (4/Hal)
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={appMode === 'surat_jalan'}
+              onClick={() => setAppMode('surat_jalan')}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                appMode === 'surat_jalan'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Surat Jalan (2/Hal)
+            </button>
+          </div>
+
           {/* Desktop & Tablet Actions */}
-          <div className="flex items-center gap-2">
+          <div className="order-2 sm:order-3 flex items-center gap-2">
             <button
               type="button"
               onClick={handleLoadSample}
@@ -309,7 +418,7 @@ export function App() {
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
-              Formulir ({resiList.length} Resi)
+              {appMode === 'surat_jalan' ? 'Formulir Surat Jalan' : `Formulir (${resiList.length} Resi)`}
             </button>
             <button
               type="button"
@@ -321,23 +430,20 @@ export function App() {
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              Pratinjau A4 ({pages.length})
+              {appMode === 'surat_jalan' ? 'Pratinjau A4' : `Pratinjau A4 (${pages.length})`}
             </button>
           </div>
         </div>
 
         {/* Main Split-Screen Workspace */}
         <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
-          {/* Left Panel: Cascading Resi Form */}
+          {/* Left Panel: Cascading Form */}
           <section
             className={`${
               mobileTab === 'form' ? 'flex' : 'hidden'
             } lg:flex flex-col w-full lg:w-[460px] xl:w-[510px] lg:flex-shrink-0 bg-gradient-to-b from-slate-50 via-sky-50/30 to-emerald-50/30 lg:border-r border-slate-200 lg:h-full`}
           >
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-4 pb-24 lg:pb-8">
-              {/* Sender Kop Selector (SM & SJU) */}
-              <SenderHeaderCard sender={sender} onChange={setSender} />
-
               {/* Mobile Quick Utilities */}
               <div className="flex sm:hidden items-center justify-between gap-2">
                 <button
@@ -358,44 +464,64 @@ export function App() {
                 </button>
               </div>
 
-              {/* Resi Cards List */}
-              <div className="space-y-3.5">
-                {resiList.map((item, idx) => (
-                  <ResiFormCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    total={resiList.length}
-                    isActive={activeResiId === item.id}
-                    koliInputRef={(el) => {
-                      koliRefs.current[item.id] = el;
-                    }}
-                    onFocus={() => setActiveResiId(item.id)}
-                    onChange={(patch) => handleUpdateResi(item.id, patch)}
-                    onDuplicate={() => handleDuplicateResi(idx)}
-                    onAutoGenerateKoli={(count) => handleAutoGenerateKoli(idx, count)}
-                    onDelete={() => handleDeleteResi(item.id)}
-                    onMoveUp={() => handleMoveResi(idx, -1)}
-                    onMoveDown={() => handleMoveResi(idx, 1)}
-                  />
-                ))}
-              </div>
+              {appMode === 'surat_jalan' ? (
+                <SuratJalanForm
+                  data={suratJalan}
+                  sender={sjSender}
+                  hasResiData={resiList.some(isResiFilled)}
+                  onSenderChange={setSjSender}
+                  onChange={(patch) =>
+                    setSuratJalan((prev) => ({ ...prev, ...patch }))
+                  }
+                  onCopyFromResi={handleCopyFromResiToSuratJalan}
+                />
+              ) : (
+                <>
+                  {/* Sender Kop Selector (SM & SJU) */}
+                  <SenderHeaderCard sender={sender} onChange={setSender} />
 
-              {/* Add Resi CTA (unlimited, auto-paginated 4 per A4) */}
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={handleAddResi}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/70 py-3 px-4 text-sm font-bold text-emerald-800 hover:border-emerald-600 hover:bg-emerald-100/80 transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  Tambah Resi Baru ({resiList.length} resi • {pages.length} Hal. A4)
-                </button>
-                <p className="mt-2 text-center text-[11px] text-slate-500">
-                  <span className="font-semibold text-emerald-700">{filledCount} resi terisi</span>{' '}
-                  • 4 resi per halaman A4, bertambah otomatis sesuai jumlah koli.
-                </p>
-              </div>
+                  {/* Resi Cards List */}
+                  <div className="space-y-3.5">
+                    {resiList.map((item, idx) => (
+                      <ResiFormCard
+                        key={item.id}
+                        item={item}
+                        index={idx}
+                        total={resiList.length}
+                        isActive={activeResiId === item.id}
+                        koliInputRef={(el) => {
+                          koliRefs.current[item.id] = el;
+                        }}
+                        onFocus={() => setActiveResiId(item.id)}
+                        onChange={(patch) => handleUpdateResi(item.id, patch)}
+                        onDuplicate={() => handleDuplicateResi(idx)}
+                        onAutoGenerateKoli={(count) => handleAutoGenerateKoli(idx, count)}
+                        onDelete={() => handleDeleteResi(item.id)}
+                        onMoveUp={() => handleMoveResi(idx, -1)}
+                        onMoveDown={() => handleMoveResi(idx, 1)}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Add Resi CTA (unlimited, auto-paginated 4 per A4) */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAddResi}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/70 py-3 px-4 text-sm font-bold text-emerald-800 hover:border-emerald-600 hover:bg-emerald-100/80 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Tambah Resi Baru ({resiList.length} resi • {pages.length} Hal. A4)
+                    </button>
+                    <p className="mt-2 text-center text-[11px] text-slate-500">
+                      <span className="font-semibold text-emerald-700">
+                        {filledCount} resi terisi
+                      </span>{' '}
+                      • 4 resi per halaman A4, bertambah otomatis sesuai jumlah koli.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
@@ -405,14 +531,23 @@ export function App() {
               mobileTab === 'preview' ? 'flex' : 'hidden'
             } lg:flex flex-1 flex-col min-w-0 h-[calc(100vh-116px)] lg:h-full`}
           >
-            <PreviewPane
-              items={resiList}
-              sender={sender}
-              showCutLines={showCutLines}
-              activeResiId={activeResiId}
-              onToggleCutLines={() => setShowCutLines((v) => !v)}
-              onSelectSlot={handleSelectSlot}
-            />
+            {appMode === 'surat_jalan' ? (
+              <SuratJalanPreviewPane
+                data={suratJalan}
+                sender={sjSender}
+                showCutLines={showCutLines}
+                onToggleCutLines={() => setShowCutLines((v) => !v)}
+              />
+            ) : (
+              <PreviewPane
+                items={resiList}
+                sender={sender}
+                showCutLines={showCutLines}
+                activeResiId={activeResiId}
+                onToggleCutLines={() => setShowCutLines((v) => !v)}
+                onSelectSlot={handleSelectSlot}
+              />
+            )}
           </section>
         </main>
 
@@ -425,7 +560,9 @@ export function App() {
               className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 py-2.5 px-2 text-xs font-bold text-indigo-700"
             >
               <Eye className="w-4 h-4 flex-shrink-0" />
-              <span>Pratinjau ({pages.length})</span>
+              <span>
+                {appMode === 'surat_jalan' ? 'Pratinjau' : `Pratinjau (${pages.length})`}
+              </span>
             </button>
             <button
               type="button"
@@ -483,18 +620,28 @@ export function App() {
 
       {/* Off-screen Multi-Page Unscaled A4 Export Target + Native Print Surface */}
       <div ref={exportRef} aria-hidden="true" className="print-only-sheet offscreen-print-sheet">
-        {pages.map((pageItems, pageIdx) => (
-          <div key={`export-page-${pageIdx}`} className="print-page-wrapper">
-            <A3Sheet
-              items={pageItems}
-              sender={sender}
+        {appMode === 'surat_jalan' ? (
+          <div className="print-page-wrapper">
+            <SuratJalanSheet
+              data={suratJalan}
+              sender={sjSender}
               showCutLines={showCutLines}
-              isExport={true}
-              pageNumber={pageIdx + 1}
-              startIndex={pageIdx * RESI_PER_PAGE}
             />
           </div>
-        ))}
+        ) : (
+          pages.map((pageItems, pageIdx) => (
+            <div key={`export-page-${pageIdx}`} className="print-page-wrapper">
+              <A3Sheet
+                items={pageItems}
+                sender={sender}
+                showCutLines={showCutLines}
+                isExport={true}
+                pageNumber={pageIdx + 1}
+                startIndex={pageIdx * RESI_PER_PAGE}
+              />
+            </div>
+          ))
+        )}
       </div>
     </>
   );

@@ -32,12 +32,12 @@ function getFilePrefix(presetId: SenderPresetId): string {
 }
 
 // Convert CSS pixels (96 DPI A4 = 794px) to mm and points
-const PX_TO_MM = A4_WIDTH_MM / A4_PX_WIDTH; // ~0.26448 mm/px
-const PX_TO_PT = 0.75; // 1 CSS px = 0.75 pt
-const PT_TO_MM = 25.4 / 72; // ~0.35278 mm/pt
-const CAP_HEIGHT_RATIO = 0.64; // Calibri cap height ratio
+export const PX_TO_MM = A4_WIDTH_MM / A4_PX_WIDTH; // ~0.26448 mm/px
+export const PX_TO_PT = 0.75; // 1 CSS px = 0.75 pt
+export const PT_TO_MM = 25.4 / 72; // ~0.35278 mm/pt
+export const CAP_HEIGHT_RATIO = 0.64; // Calibri cap height ratio
 
-interface CalibriFontPair {
+export interface CalibriFontPair {
   regular: string;
   bold: string;
 }
@@ -55,7 +55,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-async function loadCalibriFonts(): Promise<CalibriFontPair | null> {
+export async function loadCalibriFonts(): Promise<CalibriFontPair | null> {
   if (cachedCalibriFonts) return cachedCalibriFonts;
 
   const injected = (globalThis as unknown as { __CALIBRI_FONTS?: CalibriFontPair })
@@ -89,13 +89,13 @@ async function loadCalibriFonts(): Promise<CalibriFontPair | null> {
   }
 }
 
-interface ResolvedLogo {
+export interface ResolvedLogo {
   dataUrl: string;
   format: 'PNG' | 'JPEG';
   aspectRatio: number;
 }
 
-async function resolveLogoForPdf(sender: SenderHeader): Promise<ResolvedLogo> {
+export async function resolveLogoForPdf(sender: SenderHeader): Promise<ResolvedLogo> {
   if (!sender.logoDataUrl) {
     if (sender.presetId === 'sju') {
       return {
@@ -170,7 +170,7 @@ function formatPhoneDisplay(raw: string): string {
   return `No. HP: ${trimmed}`;
 }
 
-function sanitizePdfText(input: string): string {
+export function sanitizePdfText(input: string): string {
   return input
     .replace(/\r\n/g, '\n')
     .replace(/\u00A0/g, ' ')
@@ -207,7 +207,7 @@ function fitSingleLinePt(
   return Math.floor(best * 4) / 4;
 }
 
-function drawCenteredLines(
+export function drawCenteredLines(
   doc: jsPDF,
   lines: string[],
   centerX: number,
@@ -228,7 +228,7 @@ function drawCenteredLines(
   });
 }
 
-function drawCutLine(doc: jsPDF, cardX: number, cardW: number, cutY: number): void {
+export function drawCutLine(doc: jsPDF, cardX: number, cardW: number, cutY: number): void {
   const overhangMm = 14 * PX_TO_MM;
   const tickLenMm = 10 * PX_TO_MM;
   const leftEdge = cardX - overhangMm;

@@ -4,6 +4,7 @@ import {
   ResiItem,
   SenderHeader,
   SenderPresetId,
+  SuratJalanData,
 } from './types';
 
 export const A4_WIDTH_MM = 210;
@@ -226,4 +227,156 @@ export function createSampleResiList(): ResiItem[] {
       koliKe: '4',
     },
   ];
+}
+
+export const SURAT_JALAN_SENDER_PRESETS: Record<SenderPresetId, SenderHeader> = {
+  sm: {
+    presetId: 'sm',
+    title: 'SUARA MUHAMMADIYAH',
+    address: 'Jl. KHA Dahlan No. 107 Yogyakarta 55262',
+    phone: '0818 - 1818 - 1727',
+    email: 'penerbitsm@gmail.com / Adm2015penerbitsm@gmail.com',
+    logoDataUrl: null,
+  },
+  sju: {
+    presetId: 'sju',
+    title: 'CV. SURYA JAYA UTOMO',
+    address: 'Jl. Perbalan RT.03/RW.08 Kel. Gunungpati, Kec. Gunungpati Kota Semarang',
+    phone: '0822-3251-8345 / 0822-7217-2431',
+    email: 'suryajayabookstore1900@gmail.com',
+    logoDataUrl: null,
+  },
+};
+
+export function formatShortDateId(date = new Date()): string {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = months[date.getMonth()] ?? 'Jan';
+  const y = String(date.getFullYear()).slice(-2);
+  return `${d}-${m}-${y}`;
+}
+
+export function createEmptySuratJalan(presetId: SenderPresetId = 'sm'): SuratJalanData {
+  return {
+    nomor: presetId === 'sju' ? '01/SJU/AKBAR/X/2026' : '15/SM/MAP/2026',
+    tanggal: formatShortDateId(),
+    pengirim: '',
+    kepada: '',
+    alamat: '',
+    telepon: '',
+    rows: [
+      {
+        id: crypto.randomUUID(),
+        namaBarang: '',
+        qty: '',
+        jumlahKoli: '',
+        keterangan: '',
+      },
+      {
+        id: crypto.randomUUID(),
+        namaBarang: '',
+        qty: '',
+        jumlahKoli: '',
+        keterangan: '',
+      },
+    ],
+    beratPerKoli: '',
+    totalBerat: '',
+    catatan:
+      'Apabila ada ketidaksesuaian kualitas maupun jumlah, komplain akan dilayani 1 minggu setelah barang dikirim.',
+    footnote: '*Mohon sertakan nama lengkap dan tanggal pada waktu tanda tangan.',
+    showCopyLabels: true,
+  };
+}
+
+export function createSampleSuratJalan(presetId: SenderPresetId): SuratJalanData {
+  if (presetId === 'sju') {
+    return {
+      nomor: '01/SJU/AKBAR/X/2026',
+      tanggal: formatShortDateId(),
+      pengirim: '',
+      kepada: 'Hj. Kamila',
+      alamat:
+        'Jl. Pasewarna RT 04/ RW 02\nDsn. Krajan Wotukebo Wongsorejo\nKab. Banyuwangi',
+      telepon: '0852 5953 7200',
+      rows: [
+        {
+          id: crypto.randomUUID(),
+          namaBarang: 'AKBAR 2 BUKU KEL A',
+          qty: '1.806',
+          jumlahKoli: '18',
+          keterangan: '16 KOLI @ 100',
+        },
+        {
+          id: crypto.randomUUID(),
+          namaBarang: 'AKBAR 2 BUKU KEL B',
+          qty: '1.534',
+          jumlahKoli: '15',
+          keterangan: '13 KOLI @ 100 + 40',
+        },
+      ],
+      beratPerKoli: '',
+      totalBerat: '',
+      catatan:
+        'Apabila ada ketidaksesuaian kualitas maupun jumlah, komplain akan dilayani 1 minggu setelah barang dikirim.',
+      footnote: '*Mohon sertakan nama lengkap dan tanggal pada waktu tanda tangan.',
+      showCopyLabels: true,
+    };
+  }
+
+  return {
+    nomor: '15/SM/MAP/2026',
+    tanggal: formatShortDateId(),
+    pengirim: '',
+    kepada: 'BU INA LAUNDRY',
+    alamat:
+      'JL. INSPEKSI KANAL SELATAN II NO 80 KEL. BONTOLEBANG\nKOTA MAKASAR PROV. SULAWESI SELASAN',
+    telepon: '0813-5513-1385',
+    rows: [
+      {
+        id: crypto.randomUUID(),
+        namaBarang: 'MAP RAPORT LAMA KARTON',
+        qty: '6.800',
+        jumlahKoli: '62',
+        keterangan: '61 KOLI @ 110 PCS\n1 KOLI @ 90 PCS',
+      },
+      {
+        id: crypto.randomUUID(),
+        namaBarang: '',
+        qty: '',
+        jumlahKoli: '',
+        keterangan: '',
+      },
+    ],
+    beratPerKoli: 'Berat @ 44 Kg',
+    totalBerat: 'Total Berat 2.684 Kg',
+    catatan:
+      'Apabila ada ketidaksesuaian kualitas maupun jumlah, komplain akan dilayani 1 minggu setelah barang dikirim.',
+    footnote: '*Mohon sertakan nama lengkap dan tanggal pada waktu tanda tangan.',
+    showCopyLabels: true,
+  };
+}
+
+export function parseIndonesianNumber(raw: string): number {
+  const cleaned = raw.trim().replace(/\./g, '').replace(/,/g, '.');
+  const num = Number.parseFloat(cleaned);
+  return Number.isFinite(num) ? num : 0;
+}
+
+export function formatIndonesianNumber(num: number): string {
+  if (!Number.isFinite(num) || num === 0) return '';
+  return new Intl.NumberFormat('id-ID').format(num);
 }

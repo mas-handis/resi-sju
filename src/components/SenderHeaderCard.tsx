@@ -7,6 +7,7 @@ import { SuaraMuhammadiyahLogo } from './SuaraMuhammadiyahLogo';
 interface SenderHeaderCardProps {
   sender: SenderHeader;
   onChange: (next: SenderHeader) => void;
+  presets?: Record<SenderPresetId, SenderHeader>;
 }
 
 const PRESET_OPTIONS: { id: SenderPresetId; label: string; shortLabel: string }[] = [
@@ -14,12 +15,16 @@ const PRESET_OPTIONS: { id: SenderPresetId; label: string; shortLabel: string }[
   { id: 'sju', label: 'Surya Jaya Utomo (SJU)', shortLabel: 'SJU' },
 ];
 
-export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({ sender, onChange }) => {
+export const SenderHeaderCard: React.FC<SenderHeaderCardProps> = ({
+  sender,
+  onChange,
+  presets = SENDER_PRESETS,
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSelectPreset = (presetId: SenderPresetId) => {
-    onChange({ ...SENDER_PRESETS[presetId] });
+    onChange({ ...presets[presetId] });
     setIsEditing(false);
   };
 

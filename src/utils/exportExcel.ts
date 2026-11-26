@@ -1,10 +1,12 @@
 import * as XLSX from 'xlsx';
 import {
+  formatIndonesianNumber,
   getKelompokColor,
   getResiBottomRows,
   isResiFilled,
+  parseIndonesianNumber,
 } from '../constants';
-import { ResiItem, SenderHeader } from '../types';
+import { ResiItem, SenderHeader, SuratJalanData } from '../types';
 import { buildTimestamp } from './exportSheet';
 
 /**
@@ -99,6 +101,86 @@ export function downloadResiExcel(resiList: ResiItem[], sender: SenderHeader): s
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Rekap Resi');
 
   const prefix = sender.presetId === 'sju' ? 'rekap-resi-sju' : 'rekap-resi-suara-muhammadiyah';
+  const filename = `${prefix}-${buildTimestamp()}.xlsx`;
+
+  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return filename;
+}
+
+/**
+ * Generates and downloads an Excel (.xlsx) summary for Surat Jalan.
+ */
+export function downloadSuratJalanExcel(
+  data: SuratJalanData,
+  sender: SenderHeader
+): string {
+  const activeRows = data.rows.filter(
+    (r) =>
+      r.namaBarang.trim() ||
+      r.qty.trim() ||
+      r.jumlahKoli.trim() ||
+      r.keterangan.trim()
+  );
+  const rowsToExport = activeRows.length > 0 ? activeRows : data.rows;
+
+  const totalQty = data.rows.reduce((sum, r) => sum + parseIndonesianNumber(r.qty), 0);
+  const totalKoli = data.rows.reduce(
+    (sum, r) => sum + parseIndonesianNumber(r.jumlahKoli),
+    0
+  );
+
+  const aoa: (string | number)[][] = [
+    ['SURAT JALAN', sender.title],
+    ['Nomor', data.nomor, 'Kepada', data.kepada],
+    ['Tanggal', data.tanggal, 'Alamat', data.alamat.replace(/\n/g, ', ')],
+    ['Pengirim', data.pengirim || '-', 'Telepon', data.telepon || '-'],
+    [],
+    ['No.', 'Nama Barang', 'QTY', 'Jumlah Koli', 'Keterangan'],
+    ...rowsToExport.map((row, idx) => [
+      idx + 1,
+      row.namaBarang.trim(),
+      row.qty.trim(),
+      row.jumlahKoli.trim(),
+      row.keterangan.trim().replace(/\n/g, '; '),
+    ]),
+    [
+      'TOTAL',
+      '',
+      formatIndonesianNumber(totalQty),
+      data.beratPerKoli.trim() || formatIndonesianNumber(totalKoli),
+      data.totalBerat.trim() ||
+        (data.beratPerKoli.trim() && totalKoli
+          ? `${formatIndonesianNumber(totalKoli)} KOLI`
+          : ''),
+    ],
+  ];
+
+  const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+  worksheet['!cols'] = [
+    { wch: 10 },
+    { wch: 36 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 38 },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Surat Jalan');
+
+  const prefix = sender.presetId === 'sju' ? 'surat-jalan-sju' : 'surat-jalan-sm';
   const filename = `${prefix}-${buildTimestamp()}.xlsx`;
 
   const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
