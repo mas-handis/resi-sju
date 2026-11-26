@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import { A4_HEIGHT_MM, A4_PX_HEIGHT, A4_PX_WIDTH, A4_WIDTH_MM } from '../constants';
 import { SenderPresetId } from '../types';
 
-function buildTimestamp(): string {
+export function buildTimestamp(): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(
@@ -82,39 +82,6 @@ async function renderPageToDataUrl(pageElement: HTMLElement): Promise<string> {
   });
 
   return canvas.toDataURL('image/png');
-}
-
-function triggerDownload(dataUrl: string, filename: string): void {
-  const link = document.createElement('a');
-  link.download = filename;
-  link.href = dataUrl;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-export async function downloadA4Png(
-  container: HTMLElement,
-  presetId: SenderPresetId
-): Promise<string> {
-  const pages = getPageElements(container);
-  const stamp = buildTimestamp();
-  const prefix = getFilePrefix(presetId);
-
-  if (pages.length === 1) {
-    const dataUrl = await renderPageToDataUrl(pages[0]);
-    const filename = `${prefix}-${stamp}.png`;
-    triggerDownload(dataUrl, filename);
-    return filename;
-  }
-
-  for (let i = 0; i < pages.length; i += 1) {
-    const dataUrl = await renderPageToDataUrl(pages[i]);
-    const filename = `${prefix}-${stamp}-hal${i + 1}.png`;
-    triggerDownload(dataUrl, filename);
-  }
-
-  return `${pages.length} file PNG (${prefix}-hal1..${pages.length})`;
 }
 
 export async function downloadA4Pdf(

@@ -3,8 +3,8 @@ import {
   CheckCircle2,
   Eye,
   FileDown,
+  FileSpreadsheet,
   FileText,
-  ImageDown,
   Loader2,
   Plus,
   Printer,
@@ -24,7 +24,8 @@ import {
   RESI_PER_PAGE,
 } from './constants';
 import { ResiItem, SenderHeader } from './types';
-import { downloadA4Pdf, downloadA4Png } from './utils/exportSheet';
+import { downloadResiExcel } from './utils/exportExcel';
+import { downloadA4Pdf } from './utils/exportSheet';
 
 interface ToastState {
   message: string;
@@ -37,7 +38,7 @@ export function App() {
   const [showCutLines, setShowCutLines] = useState<boolean>(true);
   const [activeResiId, setActiveResiId] = useState<string | null>(() => resiList[0]?.id ?? null);
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
-  const [exportingType, setExportingType] = useState<'pdf' | 'png' | null>(null);
+  const [exportingType, setExportingType] = useState<'pdf' | 'excel' | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const exportRef = useRef<HTMLDivElement | null>(null);
@@ -195,14 +196,15 @@ export function App() {
     });
   };
 
-  const handleExport = async (type: 'pdf' | 'png') => {
-    if (!exportRef.current || exportingType) return;
+  const handleExport = async (type: 'pdf' | 'excel') => {
+    if (exportingType) return;
+    if (type === 'pdf' && !exportRef.current) return;
     setExportingType(type);
     try {
       const result =
         type === 'pdf'
-          ? await downloadA4Pdf(exportRef.current, sender.presetId)
-          : await downloadA4Png(exportRef.current, sender.presetId);
+          ? await downloadA4Pdf(exportRef.current!, sender.presetId)
+          : downloadResiExcel(resiList, sender);
       showToast(`Berhasil mengunduh ${result}`);
     } catch (err) {
       console.error('Export failed:', err);
@@ -269,16 +271,17 @@ export function App() {
             <button
               type="button"
               disabled={exportingType !== null}
-              onClick={() => handleExport('png')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2 text-xs font-bold text-white hover:bg-sky-400 disabled:opacity-50 shadow-sm transition-colors"
+              onClick={() => handleExport('excel')}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-lime-300 px-3 py-2 text-xs font-bold text-emerald-950 hover:bg-lime-200 disabled:opacity-50 shadow-sm transition-colors"
+              title="Unduh rekap data resi ke file Excel (.xlsx)"
             >
-              {exportingType === 'png' ? (
+              {exportingType === 'excel' ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <ImageDown className="w-3.5 h-3.5" />
+                <FileSpreadsheet className="w-3.5 h-3.5" />
               )}
-              <span className="hidden sm:inline">Download PNG</span>
-              <span className="sm:hidden">PNG</span>
+              <span className="hidden sm:inline">Download Excel</span>
+              <span className="sm:hidden">Excel</span>
             </button>
 
             <button
@@ -420,27 +423,40 @@ export function App() {
 
         {/* Mobile Sticky Bottom Bar */}
         {mobileTab === 'form' && (
-          <div className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-2.5 flex items-center gap-2.5 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
+          <div className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 px-3 py-2.5 flex items-center gap-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
             <button
               type="button"
               onClick={() => setMobileTab('preview')}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 py-2.5 text-xs font-bold text-indigo-700"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 py-2.5 px-2 text-xs font-bold text-indigo-700"
             >
-              <Eye className="w-4 h-4" />
-              Pratinjau ({pages.length} Hal)
+              <Eye className="w-4 h-4 flex-shrink-0" />
+              <span>Pratinjau ({pages.length})</span>
+            </button>
+            <button
+              type="button"
+              disabled={exportingType !== null}
+              onClick={() => handleExport('excel')}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 py-2.5 px-3 text-xs font-bold text-emerald-800 disabled:opacity-50"
+            >
+              {exportingType === 'excel' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Excel
             </button>
             <button
               type="button"
               disabled={exportingType !== null}
               onClick={() => handleExport('pdf')}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-50"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 px-2 text-xs font-bold text-white shadow-sm disabled:opacity-50"
             >
               {exportingType === 'pdf' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <FileDown className="w-4 h-4" />
+                <FileDown className="w-4 h-4 flex-shrink-0" />
               )}
-              Download PDF
+              <span>Download PDF</span>
             </button>
           </div>
         )}
