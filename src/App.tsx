@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { A3Sheet } from './components/A3Sheet';
 import { CloudHubModal, CloudHubTab } from './components/CloudHubModal';
+import { DatabaseDashboard } from './components/DatabaseDashboard';
 import { PreviewPane } from './components/PreviewPane';
 import { ResiFormCard } from './components/ResiFormCard';
 import { SenderHeaderCard } from './components/SenderHeaderCard';
@@ -39,6 +40,7 @@ import {
   SURAT_JALAN_SENDER_PRESETS,
 } from './constants';
 import {
+  deleteSavedItem,
   deleteSavedRecipient,
   deleteShipmentRecord,
   fetchCloudBundle,
@@ -58,6 +60,7 @@ import {
   ShipmentRecord,
   SuratJalanData,
 } from './types';
+import { isAdminAuthenticated } from './utils/adminAuth';
 import { downloadResiExcel, downloadSuratJalanExcel } from './utils/exportExcel';
 import { downloadA4Pdf } from './utils/exportSheet';
 import { downloadSuratJalanPdf } from './utils/exportSuratJalanPdf';
@@ -104,6 +107,15 @@ export function App() {
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [isSavingCloud, setIsSavingCloud] = useState(false);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => isAdminAuthenticated());
+  const [isDatabaseRoute, setIsDatabaseRoute] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.location.pathname === '/database' ||
+      window.location.hash === '#/database' ||
+      window.location.search.includes('page=database')
+    );
+  });
   const [hasSwitchedMode, setHasSwitchedMode] = useState(false);
   const [modePillRect, setModePillRect] = useState<{ left: number; width: number; ready: boolean }>({
     left: 4,
@@ -166,6 +178,37 @@ export function App() {
   useEffect(() => {
     void syncSharedDatabase();
   }, [syncSharedDatabase]);
+
+  useEffect(() => {
+    const onRouteChange = () => {
+      setIsDatabaseRoute(
+        window.location.pathname === '/database' ||
+          window.location.hash === '#/database' ||
+          window.location.search.includes('page=database')
+      );
+    };
+    window.addEventListener('popstate', onRouteChange);
+    window.addEventListener('hashchange', onRouteChange);
+    return () => {
+      window.removeEventListener('popstate', onRouteChange);
+      window.removeEventListener('hashchange', onRouteChange);
+    };
+  }, []);
+
+  const navigateToDatabase = () => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/database');
+    }
+    setIsDatabaseRoute(true);
+    void syncSharedDatabase();
+  };
+
+  const navigateBackHome = () => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/');
+    }
+    setIsDatabaseRoute(false);
+  };
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', themeMode === 'dark');
@@ -615,9 +658,60 @@ export function App() {
     }
   };
 
+  const handleAdminDeleteRecipient = async (id: string) => {
+    if (!isAdminAuthenticated()) {
+      showToast('Login admin terlebih dahulu untuk menghapus alamat.');
+      return;
+    }
+    await deleteSavedRecipient(id);
+    await syncSharedDatabase();
+    showToast('Alamat dihapus.');
+  };
+
+  const handleAdminDeleteItem = async (id: string) => {
+    if (!isAdminAuthenticated()) {
+      showToast('Login admin terlebih dahulu untuk menghapus barang.');
+      return;
+    }
+    await deleteSavedItem(id);
+    await syncSharedDatabase();
+    showToast('Barang dihapus.');
+  };
+
+  const handleAdminDeleteRecord = async (id: string) => {
+    if (!isAdminAuthenticated()) {
+      showToast('Login admin terlebih dahulu untuk menghapus riwayat.');
+      return;
+    }
+    await deleteShipmentRecord(id);
+    await syncSharedDatabase();
+    showToast('Riwayat dihapus.');
+  };
+
   const filledCount = resiList.filter(isResiFilled).length;
   const activeSender = appMode === 'surat_jalan' ? sjSender : sender;
   const senderLabel = activeSender.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah';
+
+  if (isDatabaseRoute) {
+    return (
+      <DatabaseDashboard
+        themeMode={themeMode}
+        onToggleTheme={() => setThemeMode((t) => (t === 'dark' ? 'light' : 'dark'))}
+        isAdmin={isAdmin}
+        onAdminAuthChange={setIsAdmin}
+        recipients={savedRecipients}
+        items={savedItems}
+        history={shipmentHistory}
+        isSyncing={isSyncingCloud}
+        isCloudConnected={isCloudConnected}
+        onRefresh={syncSharedDatabase}
+        onDeleteRecipient={handleAdminDeleteRecipient}
+        onDeleteItem={handleAdminDeleteItem}
+        onDeleteRecord={handleAdminDeleteRecord}
+        onBackToApp={navigateBackHome}
+      />
+    );
+  }
 
   return (
     <>
@@ -738,7 +832,7 @@ export function App() {
               <BookUser className="w-3.5 h-3.5 text-orange-600 dark:text-orange-300" />
               <span className="hidden md:inline">Riwayat Penggunaan</span>
               <span className="rounded-full bg-emerald-500/15 dark:bg-emerald-500/30 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:text-emerald-200">
-                {savedRecipients.length}
+                {isAdmin ? shipmentHistory.length : Math.min(shipmentHistory.length, 5)}
               </span>
             </button>
 
@@ -1079,6 +1173,9 @@ export function App() {
         recipients={savedRecipients}
         history={shipmentHistory}
         appMode={appMode}
+        isAdmin={isAdmin}
+        onAdminAuthChange={setIsAdmin}
+        onOpenDatabaseDashboard={navigateToDatabase}
         isSyncing={isSyncingCloud}
         isCloudConnected={isCloudConnected}
         onRefresh={syncSharedDatabase}
@@ -1088,17 +1185,9 @@ export function App() {
           showToast(`Alamat "${input.recipientName}" disimpan ke Buku Alamat.`);
         }}
         onUseRecipient={handleUseSavedRecipient}
-        onDeleteRecipient={async (id) => {
-          await deleteSavedRecipient(id);
-          await syncSharedDatabase();
-          showToast('Alamat dihapus.');
-        }}
+        onDeleteRecipient={handleAdminDeleteRecipient}
         onLoadRecord={handleLoadShipmentRecord}
-        onDeleteRecord={async (id) => {
-          await deleteShipmentRecord(id);
-          await syncSharedDatabase();
-          showToast('Riwayat dihapus.');
-        }}
+        onDeleteRecord={handleAdminDeleteRecord}
       />
 
       {/* Off-screen Multi-Page Unscaled A4 Export Target + Native Print Surface */}

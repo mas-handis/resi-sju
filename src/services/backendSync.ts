@@ -885,6 +885,23 @@ export async function deleteShipmentRecord(
   }
 }
 
+export async function deleteSavedItem(
+  id: string,
+  client: SupabaseClient | null = supabase
+): Promise<void> {
+  markIdDeleted(id);
+  const nextLocal = loadLocalItemCatalog().filter((i) => i.id !== id);
+  writeJsonStorage(LS_ITEMS_KEY, nextLocal);
+
+  if (client) {
+    try {
+      await client.from('saved_items_catalog').delete().eq('id', id);
+    } catch {
+      // ignore if offline
+    }
+  }
+}
+
 export function filterRecipientSuggestions(
   recipients: SavedRecipient[],
   rawQuery: string,
