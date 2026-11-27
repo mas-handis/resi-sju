@@ -72,6 +72,7 @@ export interface SavedRecipient {
   normalizedKey: string;
   useCount: number;
   lastUsedAt: string;
+  pendingSync?: boolean;
 }
 
 export interface SavedItemSuggestion {
@@ -81,6 +82,7 @@ export interface SavedItemSuggestion {
   normalizedName: string;
   useCount: number;
   lastUsedAt: string;
+  pendingSync?: boolean;
 }
 
 export type ShipmentActionType = 'save' | 'print' | 'pdf' | 'excel';
@@ -89,6 +91,7 @@ export interface ShipmentRecord {
   id: string;
   dedupKey?: string;
   lastAction?: ShipmentActionType;
+  pendingSync?: boolean;
   docType: AppMode;
   presetId: SenderPresetId;
   title: string;

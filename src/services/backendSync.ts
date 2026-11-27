@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getResiBottomRows, isResiFilled, parseIndonesianNumber } from '../constants';
 import { supabase } from '../lib/supabase';
 import {
@@ -15,6 +16,7 @@ import {
 const LS_RECIPIENTS_KEY = 'resi_saved_recipients_v1';
 const LS_ITEMS_KEY = 'resi_saved_items_v1';
 const LS_HISTORY_KEY = 'resi_shipment_history_v1';
+const LS_DELETED_IDS_KEY = 'resi_deleted_ids_v1';
 
 // Prevent race conditions if user rapid-clicks Simpan/Print/PDF/Excel simultaneously
 const inFlightSaves = new Map<string, Promise<SaveBatchResult>>();
@@ -60,6 +62,7 @@ async function hashCanonicalString(input: string): Promise<string> {
 
 function readJsonStorage<T>(key: string, fallback: T): T {
   try {
+    if (typeof localStorage === 'undefined') return fallback;
     const raw = localStorage.getItem(key);
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
@@ -70,10 +73,21 @@ function readJsonStorage<T>(key: string, fallback: T): T {
 
 function writeJsonStorage<T>(key: string, value: T): void {
   try {
+    if (typeof localStorage === 'undefined') return;
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // ignore storage quota errors
   }
+}
+
+function getDeletedIds(): Set<string> {
+  return new Set(readJsonStorage<string[]>(LS_DELETED_IDS_KEY, []));
+}
+
+function markIdDeleted(id: string): void {
+  const current = readJsonStorage<string[]>(LS_DELETED_IDS_KEY, []);
+  const next = [id, ...current.filter((x) => x !== id)].slice(0, 200);
+  writeJsonStorage(LS_DELETED_IDS_KEY, next);
 }
 
 export function loadLocalRecipients(): SavedRecipient[] {
@@ -112,6 +126,7 @@ function mapRecipientRow(row: Record<string, unknown>): SavedRecipient {
     normalizedKey: String(row.normalized_key ?? ''),
     useCount: Number(row.use_count ?? 1),
     lastUsedAt: String(row.last_used_at ?? new Date().toISOString()),
+    pendingSync: false,
   };
 }
 
@@ -123,6 +138,7 @@ function mapItemRow(row: Record<string, unknown>): SavedItemSuggestion {
     normalizedName: String(row.normalized_name ?? ''),
     useCount: Number(row.use_count ?? 1),
     lastUsedAt: String(row.last_used_at ?? new Date().toISOString()),
+    pendingSync: false,
   };
 }
 
@@ -136,6 +152,7 @@ function mapRecordRow(row: Record<string, unknown>): ShipmentRecord {
     id: String(row.id),
     dedupKey: row.dedup_key ? String(row.dedup_key) : undefined,
     lastAction,
+    pendingSync: false,
     docType: (row.doc_type as AppMode) === 'surat_jalan' ? 'surat_jalan' : 'resi',
     presetId: row.preset_id === 'sju' ? 'sju' : 'sm',
     title: String(row.title ?? ''),
@@ -148,13 +165,139 @@ function mapRecordRow(row: Record<string, unknown>): ShipmentRecord {
   };
 }
 
-export async function fetchCloudBundle(): Promise<{
+async function queryCloudTables(client: SupabaseClient) {
+  const [recRes, itemRes, histRes] = await Promise.all([
+    client
+      .from('saved_recipients')
+      .select('*')
+      .order('use_count', { ascending: false })
+      .order('last_used_at', { ascending: false })
+      .limit(500),
+    client
+      .from('saved_items_catalog')
+      .select('*')
+      .order('use_count', { ascending: false })
+      .order('last_used_at', { ascending: false })
+      .limit(300),
+    client
+      .from('shipment_records')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(150),
+  ]);
+
+  if (recRes.error) throw recRes.error;
+  if (itemRes.error) throw itemRes.error;
+  if (histRes.error) throw histRes.error;
+
+  return {
+    recipients: (recRes.data ?? []).map((r) =>
+      mapRecipientRow(r as Record<string, unknown>)
+    ),
+    items: (itemRes.data ?? []).map((r) =>
+      mapItemRow(r as Record<string, unknown>)
+    ),
+    history: (histRes.data ?? []).map((r) =>
+      mapRecordRow(r as Record<string, unknown>)
+    ),
+  };
+}
+
+/**
+ * Push any unsynced local records (saved while offline or before DB migration)
+ * up to Supabase so they are never wiped out when fetching from an empty cloud.
+ */
+async function syncPendingLocalToCloud(
+  client: SupabaseClient,
+  cloudState: {
+    recipients: SavedRecipient[];
+    items: SavedItemSuggestion[];
+    history: ShipmentRecord[];
+  }
+): Promise<boolean> {
+  const deletedIds = getDeletedIds();
+  const cloudRecKeys = new Set(cloudState.recipients.map((r) => r.normalizedKey));
+  const cloudItemKeys = new Set(cloudState.items.map((i) => i.normalizedName));
+  const cloudDedupKeys = new Set(
+    cloudState.history.map((h) => h.dedupKey).filter((k): k is string => Boolean(k))
+  );
+
+  const localRecipients = loadLocalRecipients().filter((r) => !deletedIds.has(r.id));
+  const localItems = loadLocalItemCatalog().filter((i) => !deletedIds.has(i.id));
+  const localHistory = loadLocalHistory().filter((h) => !deletedIds.has(h.id));
+
+  let pushedAny = false;
+
+  // Sync recipients that are pendingSync OR when cloud is empty and local has recipients
+  const recipientsToPush = localRecipients.filter(
+    (r) =>
+      !cloudRecKeys.has(r.normalizedKey) &&
+      (r.pendingSync === true || cloudState.recipients.length === 0)
+  );
+  for (const r of recipientsToPush) {
+    const { error } = await client.rpc('record_recipient_usage', {
+      p_recipient_name: r.recipientName,
+      p_address: r.address,
+      p_phone: r.phone,
+      p_last_item_name: r.lastItemName,
+      p_last_color_id: r.lastColorId,
+    });
+    if (!error) pushedAny = true;
+  }
+
+  const itemsToPush = localItems.filter(
+    (i) =>
+      !cloudItemKeys.has(i.normalizedName) &&
+      (i.pendingSync === true || cloudState.items.length === 0)
+  );
+  for (const i of itemsToPush) {
+    const { error } = await client.rpc('record_item_usage', {
+      p_item_name: i.itemName,
+      p_default_color_id: i.defaultColorId,
+    });
+    if (!error) pushedAny = true;
+  }
+
+  const historyToPush = localHistory.filter((h) => {
+    if (h.dedupKey && cloudDedupKeys.has(h.dedupKey)) return false;
+    return h.pendingSync === true || cloudState.history.length === 0;
+  });
+
+  for (const h of historyToPush) {
+    const fallbackDedup =
+      h.dedupKey ||
+      `${h.docType}:${h.createdAt.slice(0, 10)}:${await hashCanonicalString(
+        JSON.stringify({ title: h.title, payload: h.payload })
+      )}`;
+    const { error } = await client.rpc('save_shared_shipment', {
+      p_dedup_key: fallbackDedup,
+      p_action: h.lastAction ?? 'save',
+      p_doc_type: h.docType,
+      p_preset_id: h.presetId,
+      p_title: h.title,
+      p_recipient_summary: h.recipientSummary,
+      p_item_count: h.itemCount,
+      p_total_koli: h.totalKoli,
+      p_sender_snapshot: h.senderSnapshot,
+      p_payload: h.payload,
+      p_recipients: [],
+      p_items: [],
+    });
+    if (!error) pushedAny = true;
+  }
+
+  return pushedAny;
+}
+
+export async function fetchCloudBundle(
+  client: SupabaseClient | null = supabase
+): Promise<{
   recipients: SavedRecipient[];
   items: SavedItemSuggestion[];
   history: ShipmentRecord[];
   fromCloud: boolean;
 }> {
-  if (!supabase) {
+  if (!client) {
     return {
       recipients: loadLocalRecipients(),
       items: loadLocalItemCatalog(),
@@ -164,45 +307,22 @@ export async function fetchCloudBundle(): Promise<{
   }
 
   try {
-    const [recRes, itemRes, histRes] = await Promise.all([
-      supabase
-        .from('saved_recipients')
-        .select('*')
-        .order('use_count', { ascending: false })
-        .order('last_used_at', { ascending: false })
-        .limit(500),
-      supabase
-        .from('saved_items_catalog')
-        .select('*')
-        .order('use_count', { ascending: false })
-        .order('last_used_at', { ascending: false })
-        .limit(300),
-      supabase
-        .from('shipment_records')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(150),
-    ]);
+    let cloud = await queryCloudTables(client);
+    const didPushLocal = await syncPendingLocalToCloud(client, cloud);
+    if (didPushLocal) {
+      cloud = await queryCloudTables(client);
+    }
 
-    if (recRes.error) throw recRes.error;
-    if (itemRes.error) throw itemRes.error;
-    if (histRes.error) throw histRes.error;
+    writeJsonStorage(LS_RECIPIENTS_KEY, cloud.recipients);
+    writeJsonStorage(LS_ITEMS_KEY, cloud.items);
+    writeJsonStorage(LS_HISTORY_KEY, cloud.history);
 
-    const recipients = (recRes.data ?? []).map((r) =>
-      mapRecipientRow(r as Record<string, unknown>)
-    );
-    const items = (itemRes.data ?? []).map((r) =>
-      mapItemRow(r as Record<string, unknown>)
-    );
-    const history = (histRes.data ?? []).map((r) =>
-      mapRecordRow(r as Record<string, unknown>)
-    );
-
-    writeJsonStorage(LS_RECIPIENTS_KEY, recipients);
-    writeJsonStorage(LS_ITEMS_KEY, items);
-    writeJsonStorage(LS_HISTORY_KEY, history);
-
-    return { recipients, items, history, fromCloud: true };
+    return {
+      recipients: cloud.recipients,
+      items: cloud.items,
+      history: cloud.history,
+      fromCloud: true,
+    };
   } catch (err) {
     console.warn('Menggunakan cache lokal (Supabase belum siap/offline):', err);
     return {
@@ -222,7 +342,10 @@ export interface UpsertRecipientInput {
   lastColorId?: KelompokColorId;
 }
 
-function upsertRecipientLocally(input: UpsertRecipientInput): SavedRecipient | null {
+function upsertRecipientLocally(
+  input: UpsertRecipientInput,
+  pendingSync = false
+): SavedRecipient | null {
   const name = input.recipientName.trim();
   if (!name) return null;
 
@@ -243,6 +366,7 @@ function upsertRecipientLocally(input: UpsertRecipientInput): SavedRecipient | n
       lastColorId: input.lastColorId || prev.lastColorId,
       useCount: prev.useCount + 1,
       lastUsedAt: nowIso,
+      pendingSync: pendingSync || prev.pendingSync,
     };
     localList[existingIdx] = updatedLocal;
   } else {
@@ -256,6 +380,7 @@ function upsertRecipientLocally(input: UpsertRecipientInput): SavedRecipient | n
       normalizedKey: key,
       useCount: 1,
       lastUsedAt: nowIso,
+      pendingSync,
     };
     localList.unshift(updatedLocal);
   }
@@ -265,7 +390,8 @@ function upsertRecipientLocally(input: UpsertRecipientInput): SavedRecipient | n
 
 function upsertItemLocally(
   itemName: string,
-  colorId: KelompokColorId = 'kelompok_a'
+  colorId: KelompokColorId = 'kelompok_a',
+  pendingSync = false
 ): SavedItemSuggestion | null {
   const cleanName = itemName.trim();
   if (!cleanName) return null;
@@ -284,6 +410,7 @@ function upsertItemLocally(
       defaultColorId: colorId,
       useCount: prev.useCount + 1,
       lastUsedAt: nowIso,
+      pendingSync: pendingSync || prev.pendingSync,
     };
     localList[existingIdx] = updatedLocal;
   } else {
@@ -294,6 +421,7 @@ function upsertItemLocally(
       normalizedName: key,
       useCount: 1,
       lastUsedAt: nowIso,
+      pendingSync,
     };
     localList.unshift(updatedLocal);
   }
@@ -302,25 +430,40 @@ function upsertItemLocally(
 }
 
 export async function recordRecipientUsage(
-  input: UpsertRecipientInput
+  input: UpsertRecipientInput,
+  client: SupabaseClient | null = supabase
 ): Promise<SavedRecipient | null> {
-  const localUpdated = upsertRecipientLocally(input);
-  if (!localUpdated) return null;
+  if (!input.recipientName.trim()) return null;
 
-  if (supabase) {
-    const { data, error } = await supabase.rpc('record_recipient_usage', {
-      p_recipient_name: input.recipientName.trim(),
-      p_address: input.address.trim(),
-      p_phone: input.phone.trim(),
-      p_last_item_name: input.lastItemName?.trim() ?? '',
-      p_last_color_id: input.lastColorId ?? 'kelompok_a',
-    });
-    if (!error && data) {
-      return mapRecipientRow(data as Record<string, unknown>);
+  if (client) {
+    try {
+      const { data, error } = await client.rpc('record_recipient_usage', {
+        p_recipient_name: input.recipientName.trim(),
+        p_address: input.address.trim(),
+        p_phone: input.phone.trim(),
+        p_last_item_name: input.lastItemName?.trim() ?? '',
+        p_last_color_id: input.lastColorId ?? 'kelompok_a',
+      });
+      if (!error && data) {
+        const saved = mapRecipientRow(data as Record<string, unknown>);
+        const nextList = [
+          saved,
+          ...loadLocalRecipients().filter(
+            (r) => r.normalizedKey !== saved.normalizedKey
+          ),
+        ];
+        writeJsonStorage(LS_RECIPIENTS_KEY, nextList);
+        return saved;
+      }
+      if (error) {
+        console.warn('Supabase record_recipient_usage error:', error);
+      }
+    } catch (err) {
+      console.warn('Supabase record_recipient_usage exception:', err);
     }
   }
 
-  return localUpdated;
+  return upsertRecipientLocally(input, true);
 }
 
 export interface SaveBatchParams {
@@ -562,7 +705,8 @@ function extractBatchMetadata(params: Omit<SaveBatchParams, 'action'>) {
 }
 
 export async function recordShipmentWithDedup(
-  params: SaveBatchParams
+  params: SaveBatchParams,
+  client: SupabaseClient | null = supabase
 ): Promise<SaveBatchResult> {
   if (!isBatchFilled(params)) {
     return { saved: false, duplicate: false, empty: true, cloudSynced: false };
@@ -582,14 +726,13 @@ export async function recordShipmentWithDedup(
     const localHist = loadLocalHistory();
     const existingLocal = localHist.find((h) => h.dedupKey === dedupKey);
 
-    // Strip heavy logoDataUrl when persisting cloud JSON snapshot cleanly if untouched, or keep lightweight snapshot
     const senderSnapshot: SenderHeader = {
       ...params.sender,
     };
 
-    if (supabase) {
+    if (client) {
       try {
-        const { data, error } = await supabase.rpc('save_shared_shipment', {
+        const { data, error } = await client.rpc('save_shared_shipment', {
           p_dedup_key: dedupKey,
           p_action: params.action,
           p_doc_type: params.docType,
@@ -630,12 +773,15 @@ export async function recordShipmentWithDedup(
             record,
           };
         }
+        if (error) {
+          console.warn('Supabase save_shared_shipment error:', error);
+        }
       } catch (err) {
         console.warn('Gagal sinkron ke Supabase, menyimpan secara lokal:', err);
       }
     }
 
-    // Fallback to local deduplicated save
+    // Fallback to local deduplicated save (marked pendingSync so next fetch uploads it)
     if (existingLocal) {
       const updatedExisting: ShipmentRecord = {
         ...existingLocal,
@@ -655,22 +801,26 @@ export async function recordShipmentWithDedup(
     }
 
     for (const r of meta.recipientsPayload) {
-      upsertRecipientLocally({
-        recipientName: r.recipient_name,
-        address: r.address,
-        phone: r.phone,
-        lastItemName: r.last_item_name,
-        lastColorId: r.last_color_id,
-      });
+      upsertRecipientLocally(
+        {
+          recipientName: r.recipient_name,
+          address: r.address,
+          phone: r.phone,
+          lastItemName: r.last_item_name,
+          lastColorId: r.last_color_id,
+        },
+        true
+      );
     }
     for (const i of meta.itemsPayload) {
-      upsertItemLocally(i.item_name, i.default_color_id);
+      upsertItemLocally(i.item_name, i.default_color_id, true);
     }
 
     const localRecord: ShipmentRecord = {
       id: crypto.randomUUID(),
       dedupKey,
       lastAction: params.action,
+      pendingSync: true,
       docType: params.docType,
       presetId: params.sender.presetId,
       title: meta.title,
@@ -701,26 +851,34 @@ export async function recordShipmentWithDedup(
   return promise;
 }
 
-export async function deleteSavedRecipient(id: string): Promise<void> {
+export async function deleteSavedRecipient(
+  id: string,
+  client: SupabaseClient | null = supabase
+): Promise<void> {
+  markIdDeleted(id);
   const nextLocal = loadLocalRecipients().filter((r) => r.id !== id);
   writeJsonStorage(LS_RECIPIENTS_KEY, nextLocal);
 
-  if (supabase) {
+  if (client) {
     try {
-      await supabase.from('saved_recipients').delete().eq('id', id);
+      await client.from('saved_recipients').delete().eq('id', id);
     } catch {
       // ignore if offline
     }
   }
 }
 
-export async function deleteShipmentRecord(id: string): Promise<void> {
+export async function deleteShipmentRecord(
+  id: string,
+  client: SupabaseClient | null = supabase
+): Promise<void> {
+  markIdDeleted(id);
   const nextLocal = loadLocalHistory().filter((h) => h.id !== id);
   writeJsonStorage(LS_HISTORY_KEY, nextLocal);
 
-  if (supabase) {
+  if (client) {
     try {
-      await supabase.from('shipment_records').delete().eq('id', id);
+      await client.from('shipment_records').delete().eq('id', id);
     } catch {
       // ignore if offline
     }

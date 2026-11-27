@@ -128,10 +128,10 @@ SECURITY INVOKER
 SET search_path TO ''
 AS $function$
 DECLARE
-  v_name text := pg_catalog.btrim(pg_catalog.coalesce(p_recipient_name, ''));
-  v_addr text := pg_catalog.btrim(pg_catalog.coalesce(p_address, ''));
-  v_phone text := pg_catalog.btrim(pg_catalog.coalesce(p_phone, ''));
-  v_item text := pg_catalog.btrim(pg_catalog.coalesce(p_last_item_name, ''));
+  v_name text := pg_catalog.btrim(coalesce(p_recipient_name, ''));
+  v_addr text := pg_catalog.btrim(coalesce(p_address, ''));
+  v_phone text := pg_catalog.btrim(coalesce(p_phone, ''));
+  v_item text := pg_catalog.btrim(coalesce(p_last_item_name, ''));
   v_color text := CASE
     WHEN p_last_color_id IN ('kelompok_a', 'kelompok_b', 'kelompok_kb', 'tanpa_kelompok')
       THEN p_last_color_id
@@ -201,7 +201,7 @@ SECURITY INVOKER
 SET search_path TO ''
 AS $function$
 DECLARE
-  v_name text := pg_catalog.btrim(pg_catalog.coalesce(p_item_name, ''));
+  v_name text := pg_catalog.btrim(coalesce(p_item_name, ''));
   v_color text := CASE
     WHEN p_default_color_id IN ('kelompok_a', 'kelompok_b', 'kelompok_kb', 'tanpa_kelompok')
       THEN p_default_color_id
@@ -275,8 +275,8 @@ DECLARE
     WHEN p_preset_id IN ('sm', 'sju') THEN p_preset_id
     ELSE 'sm'
   END;
-  v_dedup text := pg_catalog.btrim(pg_catalog.coalesce(p_dedup_key, ''));
-  v_title text := pg_catalog.btrim(pg_catalog.coalesce(p_title, ''));
+  v_dedup text := pg_catalog.btrim(coalesce(p_dedup_key, ''));
+  v_title text := pg_catalog.btrim(coalesce(p_title, ''));
   v_record public.shipment_records;
   v_inserted boolean := false;
   v_rec jsonb;
@@ -309,11 +309,11 @@ BEGIN
     v_doc_type,
     v_preset,
     v_title,
-    pg_catalog.coalesce(p_recipient_summary, ''),
-    GREATEST(pg_catalog.coalesce(p_item_count, 1), 1),
-    GREATEST(pg_catalog.coalesce(p_total_koli, 0), 0),
-    pg_catalog.coalesce(p_sender_snapshot, '{}'::jsonb),
-    pg_catalog.coalesce(p_payload, '[]'::jsonb)
+    coalesce(p_recipient_summary, ''),
+    GREATEST(coalesce(p_item_count, 1), 1),
+    GREATEST(coalesce(p_total_koli, 0), 0),
+    coalesce(p_sender_snapshot, '{}'::jsonb),
+    coalesce(p_payload, '[]'::jsonb)
   )
   ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING
   RETURNING * INTO v_record;
@@ -322,26 +322,26 @@ BEGIN
     v_inserted := true;
 
     FOR v_rec IN
-      SELECT value FROM pg_catalog.jsonb_array_elements(pg_catalog.coalesce(p_recipients, '[]'::jsonb))
+      SELECT value FROM pg_catalog.jsonb_array_elements(coalesce(p_recipients, '[]'::jsonb))
     LOOP
-      IF pg_catalog.char_length(pg_catalog.btrim(pg_catalog.coalesce(v_rec->>'recipient_name', ''))) > 0 THEN
+      IF pg_catalog.char_length(pg_catalog.btrim(coalesce(v_rec->>'recipient_name', ''))) > 0 THEN
         PERFORM public.record_recipient_usage(
           v_rec->>'recipient_name',
-          pg_catalog.coalesce(v_rec->>'address', ''),
-          pg_catalog.coalesce(v_rec->>'phone', ''),
-          pg_catalog.coalesce(v_rec->>'last_item_name', ''),
-          pg_catalog.coalesce(v_rec->>'last_color_id', 'kelompok_a')
+          coalesce(v_rec->>'address', ''),
+          coalesce(v_rec->>'phone', ''),
+          coalesce(v_rec->>'last_item_name', ''),
+          coalesce(v_rec->>'last_color_id', 'kelompok_a')
         );
       END IF;
     END LOOP;
 
     FOR v_item IN
-      SELECT value FROM pg_catalog.jsonb_array_elements(pg_catalog.coalesce(p_items, '[]'::jsonb))
+      SELECT value FROM pg_catalog.jsonb_array_elements(coalesce(p_items, '[]'::jsonb))
     LOOP
-      IF pg_catalog.char_length(pg_catalog.btrim(pg_catalog.coalesce(v_item->>'item_name', ''))) > 0 THEN
+      IF pg_catalog.char_length(pg_catalog.btrim(coalesce(v_item->>'item_name', ''))) > 0 THEN
         PERFORM public.record_item_usage(
           v_item->>'item_name',
-          pg_catalog.coalesce(v_item->>'default_color_id', 'kelompok_a')
+          coalesce(v_item->>'default_color_id', 'kelompok_a')
         );
       END IF;
     END LOOP;
