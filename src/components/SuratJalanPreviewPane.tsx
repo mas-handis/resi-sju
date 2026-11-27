@@ -58,13 +58,13 @@ export const SuratJalanPreviewPane: React.FC<SuratJalanPreviewPaneProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-white/70 dark:bg-white/[0.06] backdrop-blur-xl border-b border-emerald-200/70 dark:border-white/12">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-xs">
-            Preview Surat Jalan A4
-          </span>
-          <span className="inline-flex items-center rounded-full bg-orange-500/15 dark:bg-orange-500/25 border border-orange-300 dark:border-orange-400/40 px-2.5 py-0.5 text-[11px] font-bold text-orange-800 dark:text-orange-200">
-            {items.length} Hal. A4
+            Live Preview A4
           </span>
           <span className="hidden sm:inline-flex items-center rounded-full bg-white/80 dark:bg-white/10 border border-emerald-200/80 dark:border-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-900 dark:text-slate-200">
             210 × 297 mm
+          </span>
+          <span className="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-500/20 border border-orange-300 dark:border-orange-400/40 px-2.5 py-0.5 text-[11px] font-bold text-orange-900 dark:text-orange-200">
+            {items.length} Halaman
           </span>
         </div>
 

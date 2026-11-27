@@ -112,6 +112,13 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
     }
   };
 
+  const handleAdjustBatchKoli = (delta: -1 | 1) => {
+    const parsed = Number.parseInt(batchKoliInput.replace(/[^\d]/g, ''), 10);
+    const base = !Number.isNaN(parsed) && parsed > 0 ? parsed : 2;
+    const next = Math.min(100, Math.max(2, base + delta));
+    setBatchKoliInput(String(next));
+  };
+
   const extras = item.extraRows ?? [];
   const totalBottomRows = 1 + extras.length;
   const primaryColor = getKelompokColor(item.colorId);
@@ -170,7 +177,7 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
             {index + 1}
           </span>
           <span className={`text-sm font-bold truncate ${theme.titleText}`}>
-            Resi #{index + 1}
+            Resi
           </span>
           <span className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-200/80 flex-shrink-0">
             • Hal. {Math.floor(index / 4) + 1}
@@ -417,19 +424,15 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                   >
                     QTY {totalBottomRows > 1 ? '#1' : ''}
                   </label>
-                  <label
+                  <input
+                    type="checkbox"
+                    checked={item.useQty !== false}
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 cursor-pointer select-none text-[11px] font-semibold text-orange-700 dark:text-orange-200"
+                    onChange={(e) => onChange({ useQty: e.target.checked })}
                     title="Centang untuk menampilkan kolom QTY pada resi"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={item.useQty !== false}
-                      onChange={(e) => onChange({ useQty: e.target.checked })}
-                      className="h-3.5 w-3.5 rounded border-orange-300 bg-white dark:border-white/30 dark:bg-black/30 text-orange-500 focus:ring-orange-500"
-                    />
-                    <span>Pakai</span>
-                  </label>
+                    aria-label="Tampilkan kolom QTY"
+                    className="h-3.5 w-3.5 cursor-pointer rounded border-orange-300 bg-white dark:border-white/30 dark:bg-black/30 text-orange-500 focus:ring-orange-500"
+                  />
                 </div>
                 <input
                   id={`qty-${item.id}`}
@@ -527,23 +530,24 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 cursor-pointer select-none text-[11px] font-semibold text-orange-700 dark:text-orange-200"
-                      title={`Centang untuk menampilkan QTY #${rowNum}`}
-                    >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                        QTY #{rowNum}
+                      </span>
                       <input
                         type="checkbox"
                         checked={extra.useQty !== false}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) =>
                           handleUpdateExtraRow(extra.id, {
                             useQty: e.target.checked,
                           })
                         }
-                        className="h-3.5 w-3.5 rounded border-orange-300 bg-white dark:border-white/30 dark:bg-black/30 text-orange-500 focus:ring-orange-500"
+                        title={`Centang untuk menampilkan QTY #${rowNum}`}
+                        aria-label={`Tampilkan QTY #${rowNum}`}
+                        className="h-3.5 w-3.5 cursor-pointer rounded border-orange-300 bg-white dark:border-white/30 dark:bg-black/30 text-orange-500 focus:ring-orange-500"
                       />
-                      <span>Pakai QTY #{rowNum}</span>
-                    </label>
+                    </div>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -672,21 +676,44 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="relative w-24 flex-shrink-0">
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAdjustBatchKoli(-1);
+                  }}
+                  title="Kurangi -1 banyak koli"
+                  aria-label="Kurangi 1 banyak koli"
+                  className="inline-flex h-[34px] w-8 items-center justify-center rounded-lg border border-emerald-200/90 bg-white/90 text-slate-700 hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition-colors flex-shrink-0"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
                 <input
-                  type="number"
-                  min={2}
-                  max={100}
+                  type="text"
+                  inputMode="numeric"
                   value={batchKoliInput}
                   onClick={(e) => e.stopPropagation()}
                   onFocus={onFocus}
-                  onChange={(e) => setBatchKoliInput(e.target.value)}
+                  onChange={(e) =>
+                    setBatchKoliInput(e.target.value.replace(/[^\d]/g, ''))
+                  }
+                  placeholder="10"
                   aria-label="Jumlah total koli"
-                  className="w-full rounded-lg border border-emerald-200/90 bg-white/90 pl-2.5 pr-7 py-1.5 text-xs font-bold text-slate-900 tabular-nums dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
+                  className="w-12 rounded-lg border border-emerald-200/90 bg-white/90 px-2 py-1.5 text-center text-xs font-bold text-slate-900 tabular-nums dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
                 />
-                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                  koli
-                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAdjustBatchKoli(1);
+                  }}
+                  title="Tambah +1 banyak koli"
+                  aria-label="Tambah 1 banyak koli"
+                  className="inline-flex h-[34px] w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 text-white hover:from-orange-400 hover:to-amber-400 transition-all flex-shrink-0 shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
               <button
                 type="button"
