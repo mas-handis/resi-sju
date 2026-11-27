@@ -670,7 +670,8 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
         {bottomRows.map((row, idx) => {
           const colorCfg = getKelompokColor(row.colorId);
           const hasRowBarang = row.namaBarang.trim().length > 0;
-          const hasRowQty = row.qty.trim().length > 0;
+          const useRowQty = row.useQty !== false;
+          const hasRowQty = useRowQty && row.qty.trim().length > 0;
           const qtyLabelFontSize =
             bottomRows.length >= 3 ? '7.5px' : bottomRows.length === 2 ? '8px' : '9px';
 
@@ -765,50 +766,56 @@ export const ResiCardPrint: React.FC<ResiCardPrintProps> = ({
                   boxSizing: 'border-box',
                 }}
               >
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: qtyLabelFontSize,
-                    fontWeight: 800,
-                    letterSpacing: '0.1em',
-                    lineHeight: 1,
-                    color: colorCfg.textHex,
-                  }}
-                >
-                  QTY
-                </span>
-                {hasRowQty ? (
-                  <div
-                    ref={(el) => {
-                      qtyTextRefs.current[idx] = el;
-                    }}
-                    style={{
-                      width: '100%',
-                      fontSize: bottomRows.length >= 3 ? '13px' : bottomRows.length === 2 ? '16px' : '21px',
-                      fontWeight: 900,
-                      letterSpacing: '0.02em',
-                      lineHeight: 1,
-                      color: colorCfg.textHex,
-                      fontVariantNumeric: 'tabular-nums',
-                      textAlign: 'center',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {row.qty}
-                  </div>
-                ) : !isExport ? (
-                  <span
-                    style={{
-                      color: colorCfg.placeholderHex,
-                      opacity: 0.65,
-                      fontWeight: 700,
-                      fontStyle: 'italic',
-                      fontSize: bottomRows.length >= 3 ? '11px' : '13px',
-                      lineHeight: 1.05,
-                    }}
-                  >
-                    —
-                  </span>
+                {useRowQty ? (
+                  <>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: qtyLabelFontSize,
+                        fontWeight: 800,
+                        letterSpacing: '0.1em',
+                        lineHeight: 1,
+                        color: colorCfg.textHex,
+                      }}
+                    >
+                      QTY
+                    </span>
+                    {hasRowQty ? (
+                      <div
+                        ref={(el) => {
+                          qtyTextRefs.current[idx] = el;
+                        }}
+                        style={{
+                          width: '100%',
+                          fontSize: bottomRows.length >= 3 ? '13px' : bottomRows.length === 2 ? '16px' : '21px',
+                          fontWeight: 900,
+                          letterSpacing: '0.02em',
+                          lineHeight: 1,
+                          color: colorCfg.textHex,
+                          fontVariantNumeric: 'tabular-nums',
+                          textAlign: 'center',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {row.qty}
+                      </div>
+                    ) : !isExport ? (
+                      <span
+                        style={{
+                          color: colorCfg.placeholderHex,
+                          opacity: 0.65,
+                          fontWeight: 700,
+                          fontStyle: 'italic',
+                          fontSize: bottomRows.length >= 3 ? '11px' : '13px',
+                          lineHeight: 1.05,
+                        }}
+                      >
+                        —
+                      </span>
+                    ) : (
+                      <span style={{ lineHeight: 1 }}>{'\u00A0'}</span>
+                    )}
+                  </>
                 ) : (
                   <span style={{ lineHeight: 1 }}>{'\u00A0'}</span>
                 )}

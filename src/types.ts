@@ -13,6 +13,7 @@ export interface ResiBottomRow {
   colorId: KelompokColorId;
   namaBarang: string;
   qty: string;
+  useQty?: boolean;
 }
 
 export interface ResiItem {
@@ -21,6 +22,7 @@ export interface ResiItem {
   noHp: string;
   namaBarang: string;
   qty: string;
+  useQty?: boolean;
   colorId?: KelompokColorId;
   extraRows?: ResiBottomRow[];
   dari: string;

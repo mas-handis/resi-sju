@@ -60,7 +60,7 @@ export function downloadResiExcel(resiList: ResiItem[], sender: SenderHeader): s
       .filter(Boolean)
       .join('; ');
     const qtySummary = rowsForExport
-      .map((r) => r.qty.trim())
+      .map((r) => (r.useQty !== false ? r.qty.trim() : ''))
       .filter(Boolean)
       .join('; ');
 

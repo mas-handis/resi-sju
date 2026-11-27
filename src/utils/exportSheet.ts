@@ -651,11 +651,14 @@ function drawResiCardPdf(
       drawCenteredLines(doc, bestLines, x + leftW / 2, rowCenterY, bestPt, 1.15);
     }
 
-    const qtyText = sanitizePdfText(row.qty.trim());
+    const useRowQty = row.useQty !== false;
+    const qtyText = useRowQty ? sanitizePdfText(row.qty.trim()) : '';
     const qtyLabelPt = qtyLabelPx * PX_TO_PT;
     const qtyLabelCapMm = qtyLabelPt * PT_TO_MM * CAP_HEIGHT_RATIO;
 
-    if (qtyText) {
+    if (!useRowQty) {
+      // Leave corner QTY cell blank when QTY is unchecked
+    } else if (qtyText) {
       const qAvailW = rightColW - 16 * PX_TO_MM;
       const qtyValPt = fitSingleLinePt(
         doc,

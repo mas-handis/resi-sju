@@ -89,6 +89,7 @@ export function getResiBottomRows(item: ResiItem): ResiBottomRow[] {
     colorId: item.colorId ?? 'kelompok_a',
     namaBarang: item.namaBarang,
     qty: item.qty,
+    useQty: item.useQty !== false,
   };
   const extras = (item.extraRows ?? []).slice(0, MAX_BOTTOM_COLOR_ROWS - 1);
   return [primary, ...extras];
