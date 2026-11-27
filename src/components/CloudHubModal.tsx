@@ -145,7 +145,7 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
             </div>
             <div className="min-w-0">
               <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white truncate">
-                Buku Alamat &amp; Riwayat Pengiriman
+                Riwayat Penggunaan &amp; Buku Alamat
               </h2>
               <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 truncate">
                 Rekomendasi alamat otomatis &amp; arsip pengiriman tersimpan di perangkat

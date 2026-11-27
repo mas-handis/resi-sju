@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   BookUser,
   CheckCircle2,
@@ -102,6 +102,45 @@ export function App() {
   const [cloudModalOpen, setCloudModalOpen] = useState(false);
   const [cloudInitialTab, setCloudInitialTab] = useState<CloudHubTab>('addresses');
   const [isSavingCloud, setIsSavingCloud] = useState(false);
+  const [hasSwitchedMode, setHasSwitchedMode] = useState(false);
+  const [modePillRect, setModePillRect] = useState<{ left: number; width: number; ready: boolean }>({
+    left: 4,
+    width: 0,
+    ready: false,
+  });
+
+  const modeTabListRef = useRef<HTMLDivElement | null>(null);
+  const resiTabRef = useRef<HTMLButtonElement | null>(null);
+  const sjTabRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleModeSwitch = (nextMode: AppMode) => {
+    if (nextMode === appMode) return;
+    setHasSwitchedMode(true);
+    setAppMode(nextMode);
+  };
+
+  useLayoutEffect(() => {
+    const updatePill = () => {
+      const container = modeTabListRef.current;
+      const activeBtn = appMode === 'resi' ? resiTabRef.current : sjTabRef.current;
+      if (!container || !activeBtn) return;
+      setModePillRect({
+        left: activeBtn.offsetLeft,
+        width: activeBtn.offsetWidth,
+        ready: true,
+      });
+    };
+
+    updatePill();
+
+    const container = modeTabListRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updatePill);
+    observer.observe(container);
+    if (resiTabRef.current) observer.observe(resiTabRef.current);
+    if (sjTabRef.current) observer.observe(sjTabRef.current);
+    return () => observer.disconnect();
+  }, [appMode]);
 
   const reloadLocalStores = useCallback(() => {
     setSavedRecipients(loadLocalRecipients());
@@ -428,10 +467,10 @@ export function App() {
         false
       );
       reloadLocalStores();
-      showToast('Tersimpan ke Riwayat & Buku Alamat diperbarui.');
+      showToast('Tersimpan ke Riwayat Penggunaan & Buku Alamat diperbarui.');
     } catch (err) {
       console.error('Save record failed:', err);
-      showToast('Gagal menyimpan ke database.');
+      showToast('Gagal menyimpan ke riwayat penggunaan.');
     } finally {
       setIsSavingCloud(false);
     }
@@ -576,38 +615,52 @@ export function App() {
             </div>
           </div>
 
-          {/* Mode Switcher: Resi vs Surat Jalan */}
+          {/* Mode Switcher: Resi vs Surat Jalan (Sliding Glass Pill) */}
           <div
-            className="order-3 sm:order-2 w-full sm:w-auto flex items-center rounded-full bg-emerald-100/80 dark:bg-white/[0.07] backdrop-blur-md p-1 border border-emerald-200/80 dark:border-white/15"
+            ref={modeTabListRef}
+            className="relative order-3 sm:order-2 w-full sm:w-auto flex items-center rounded-full bg-emerald-100/80 dark:bg-white/[0.07] backdrop-blur-md p-1 border border-emerald-200/80 dark:border-white/15"
             role="tablist"
             aria-label="Pilih Jenis Dokumen"
           >
+            <span
+              aria-hidden="true"
+              style={{
+                width: modePillRect.ready ? `${modePillRect.width}px` : undefined,
+                transform: modePillRect.ready
+                  ? `translate3d(${modePillRect.left}px, 0, 0)`
+                  : undefined,
+                opacity: modePillRect.ready ? 1 : 0,
+              }}
+              className="pointer-events-none absolute top-1 bottom-1 left-0 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 shadow-[0_4px_14px_rgba(249,115,22,0.4)] transition-[transform,width,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform"
+            />
             <button
+              ref={resiTabRef}
               type="button"
               role="tab"
               aria-selected={appMode === 'resi'}
-              onClick={() => setAppMode('resi')}
-              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+              onClick={() => handleModeSwitch('resi')}
+              className={`relative z-10 flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors duration-300 ${
                 appMode === 'resi'
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-[0_4px_14px_rgba(249,115,22,0.4)]'
-                  : 'text-emerald-900 dark:text-slate-300 hover:bg-white/60 dark:hover:text-white dark:hover:bg-white/10'
+                  ? 'text-white'
+                  : 'text-emerald-900 dark:text-slate-300 hover:text-emerald-950 dark:hover:text-white'
               }`}
             >
-              <Package className="w-3.5 h-3.5" />
+              <Package className="w-3.5 h-3.5 transition-transform duration-300" />
               Resi
             </button>
             <button
+              ref={sjTabRef}
               type="button"
               role="tab"
               aria-selected={appMode === 'surat_jalan'}
-              onClick={() => setAppMode('surat_jalan')}
-              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+              onClick={() => handleModeSwitch('surat_jalan')}
+              className={`relative z-10 flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors duration-300 ${
                 appMode === 'surat_jalan'
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-[0_4px_14px_rgba(249,115,22,0.4)]'
-                  : 'text-emerald-900 dark:text-slate-300 hover:bg-white/60 dark:hover:text-white dark:hover:bg-white/10'
+                  ? 'text-white'
+                  : 'text-emerald-900 dark:text-slate-300 hover:text-emerald-950 dark:hover:text-white'
               }`}
             >
-              <ClipboardList className="w-3.5 h-3.5" />
+              <ClipboardList className="w-3.5 h-3.5 transition-transform duration-300" />
               Surat Jalan
             </button>
           </div>
@@ -641,11 +694,11 @@ export function App() {
                 setCloudInitialTab('addresses');
                 setCloudModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-bold text-emerald-900 dark:text-white hover:bg-white dark:hover:bg-white/20 transition-colors shadow-xs"
-              title="Buka Buku Alamat & Riwayat Pengiriman"
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-bold text-emerald-900 dark:text-white hover:bg-white dark:hover:bg-white/20 transition-colors shadow-xs whitespace-nowrap"
+              title="Buka Riwayat Penggunaan & Buku Alamat"
             >
               <BookUser className="w-3.5 h-3.5 text-orange-600 dark:text-orange-300" />
-              <span className="hidden md:inline">Database</span>
+              <span className="hidden md:inline">Riwayat Penggunaan</span>
               <span className="rounded-full bg-emerald-500/15 dark:bg-emerald-500/30 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:text-emerald-200">
                 {savedRecipients.length}
               </span>
@@ -769,9 +822,9 @@ export function App() {
           <section
             className={`${
               mobileTab === 'form' ? 'flex' : 'hidden'
-            } lg:flex flex-col w-full lg:w-[460px] xl:w-[510px] lg:flex-shrink-0 bg-white/40 dark:bg-black/15 backdrop-blur-sm lg:border-r border-emerald-200/70 dark:border-white/10 lg:h-full`}
+            } lg:flex flex-col w-full lg:w-[460px] xl:w-[510px] lg:flex-shrink-0 bg-white/40 dark:bg-black/15 backdrop-blur-sm lg:border-r border-emerald-200/70 dark:border-white/10 lg:h-full overflow-x-hidden`}
           >
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-4 pb-24 lg:pb-8">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 sm:p-5 space-y-4 pb-24 lg:pb-8">
               {/* Mobile Quick Utilities */}
               <div className="flex sm:hidden items-center justify-between gap-2">
                 <button
@@ -792,72 +845,83 @@ export function App() {
                 </button>
               </div>
 
-              {appMode === 'surat_jalan' ? (
-                <SuratJalanForm
-                  items={suratJalanList}
-                  activeId={activeSjId}
-                  sender={sjSender}
-                  hasResiData={resiList.some(isResiFilled)}
-                  savedRecipients={savedRecipients}
-                  savedItems={savedItems}
-                  onSenderChange={setSjSender}
-                  onFocus={setActiveSjId}
-                  onChange={handleUpdateSuratJalan}
-                  onAdd={handleAddSuratJalan}
-                  onDuplicate={handleDuplicateSuratJalan}
-                  onDelete={handleDeleteSuratJalan}
-                  onMove={handleMoveSuratJalan}
-                  onCopyFromResi={handleCopyFromResiToSuratJalan}
-                />
-              ) : (
-                <>
-                  {/* Sender Kop Selector (SM & SJU) */}
-                  <SenderHeaderCard sender={sender} onChange={setSender} />
+              <div
+                key={`form-mode-${appMode}`}
+                className={`space-y-4 ${
+                  hasSwitchedMode
+                    ? appMode === 'surat_jalan'
+                      ? 'animate-mode-from-right'
+                      : 'animate-mode-from-left'
+                    : ''
+                }`}
+              >
+                {appMode === 'surat_jalan' ? (
+                  <SuratJalanForm
+                    items={suratJalanList}
+                    activeId={activeSjId}
+                    sender={sjSender}
+                    hasResiData={resiList.some(isResiFilled)}
+                    savedRecipients={savedRecipients}
+                    savedItems={savedItems}
+                    onSenderChange={setSjSender}
+                    onFocus={setActiveSjId}
+                    onChange={handleUpdateSuratJalan}
+                    onAdd={handleAddSuratJalan}
+                    onDuplicate={handleDuplicateSuratJalan}
+                    onDelete={handleDeleteSuratJalan}
+                    onMove={handleMoveSuratJalan}
+                    onCopyFromResi={handleCopyFromResiToSuratJalan}
+                  />
+                ) : (
+                  <>
+                    {/* Sender Kop Selector (SM & SJU) */}
+                    <SenderHeaderCard sender={sender} onChange={setSender} />
 
-                  {/* Resi Cards List */}
-                  <div className="space-y-3.5">
-                    {resiList.map((item, idx) => (
-                      <ResiFormCard
-                        key={item.id}
-                        item={item}
-                        index={idx}
-                        total={resiList.length}
-                        isActive={activeResiId === item.id}
-                        savedRecipients={savedRecipients}
-                        savedItems={savedItems}
-                        koliInputRef={(el) => {
-                          koliRefs.current[item.id] = el;
-                        }}
-                        onFocus={() => setActiveResiId(item.id)}
-                        onChange={(patch) => handleUpdateResi(item.id, patch)}
-                        onDuplicate={() => handleDuplicateResi(idx)}
-                        onAutoGenerateKoli={(count) => handleAutoGenerateKoli(idx, count)}
-                        onDelete={() => handleDeleteResi(item.id)}
-                        onMoveUp={() => handleMoveResi(idx, -1)}
-                        onMoveDown={() => handleMoveResi(idx, 1)}
-                      />
-                    ))}
-                  </div>
+                    {/* Resi Cards List */}
+                    <div className="space-y-3.5">
+                      {resiList.map((item, idx) => (
+                        <ResiFormCard
+                          key={item.id}
+                          item={item}
+                          index={idx}
+                          total={resiList.length}
+                          isActive={activeResiId === item.id}
+                          savedRecipients={savedRecipients}
+                          savedItems={savedItems}
+                          koliInputRef={(el) => {
+                            koliRefs.current[item.id] = el;
+                          }}
+                          onFocus={() => setActiveResiId(item.id)}
+                          onChange={(patch) => handleUpdateResi(item.id, patch)}
+                          onDuplicate={() => handleDuplicateResi(idx)}
+                          onAutoGenerateKoli={(count) => handleAutoGenerateKoli(idx, count)}
+                          onDelete={() => handleDeleteResi(item.id)}
+                          onMoveUp={() => handleMoveResi(idx, -1)}
+                          onMoveDown={() => handleMoveResi(idx, 1)}
+                        />
+                      ))}
+                    </div>
 
-                  {/* Add Resi CTA (unlimited, auto-paginated 4 per A4) */}
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={handleAddResi}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/60 dark:border-emerald-400/50 bg-emerald-50/80 dark:bg-emerald-500/10 backdrop-blur-md py-3 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-200 hover:border-emerald-600 dark:hover:border-emerald-400 hover:bg-emerald-100/80 dark:hover:bg-emerald-500/20 dark:hover:text-white transition-all"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Tambah Resi Baru ({resiList.length} resi • {pages.length} Hal. A4)
-                    </button>
-                    <p className="mt-2 text-center text-[11px] text-slate-600 dark:text-slate-400">
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                        {filledCount} resi terisi
-                      </span>{' '}
-                      • 4 resi per halaman A4, bertambah otomatis sesuai jumlah koli.
-                    </p>
-                  </div>
-                </>
-              )}
+                    {/* Add Resi CTA (unlimited, auto-paginated 4 per A4) */}
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={handleAddResi}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/60 dark:border-emerald-400/50 bg-emerald-50/80 dark:bg-emerald-500/10 backdrop-blur-md py-3 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-200 hover:border-emerald-600 dark:hover:border-emerald-400 hover:bg-emerald-100/80 dark:hover:bg-emerald-500/20 dark:hover:text-white transition-all"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Tambah Resi Baru ({resiList.length} resi • {pages.length} Hal. A4)
+                      </button>
+                      <p className="mt-2 text-center text-[11px] text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                          {filledCount} resi terisi
+                        </span>{' '}
+                        • 4 resi per halaman A4, bertambah otomatis sesuai jumlah koli.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </section>
 
@@ -865,27 +929,38 @@ export function App() {
           <section
             className={`${
               mobileTab === 'preview' ? 'flex' : 'hidden'
-            } lg:flex flex-1 flex-col min-w-0 h-[calc(100vh-116px)] lg:h-full`}
+            } lg:flex flex-1 flex-col min-w-0 h-[calc(100vh-116px)] lg:h-full overflow-hidden`}
           >
-            {appMode === 'surat_jalan' ? (
-              <SuratJalanPreviewPane
-                items={suratJalanList}
-                sender={sjSender}
-                showCutLines={showCutLines}
-                activeId={activeSjId}
-                onToggleCutLines={() => setShowCutLines((v) => !v)}
-                onSelectSheet={handleSelectSjSheet}
-              />
-            ) : (
-              <PreviewPane
-                items={resiList}
-                sender={sender}
-                showCutLines={showCutLines}
-                activeResiId={activeResiId}
-                onToggleCutLines={() => setShowCutLines((v) => !v)}
-                onSelectSlot={handleSelectSlot}
-              />
-            )}
+            <div
+              key={`preview-mode-${appMode}`}
+              className={`flex-1 flex flex-col min-h-0 ${
+                hasSwitchedMode
+                  ? appMode === 'surat_jalan'
+                    ? 'animate-mode-from-right'
+                    : 'animate-mode-from-left'
+                  : ''
+              }`}
+            >
+              {appMode === 'surat_jalan' ? (
+                <SuratJalanPreviewPane
+                  items={suratJalanList}
+                  sender={sjSender}
+                  showCutLines={showCutLines}
+                  activeId={activeSjId}
+                  onToggleCutLines={() => setShowCutLines((v) => !v)}
+                  onSelectSheet={handleSelectSjSheet}
+                />
+              ) : (
+                <PreviewPane
+                  items={resiList}
+                  sender={sender}
+                  showCutLines={showCutLines}
+                  activeResiId={activeResiId}
+                  onToggleCutLines={() => setShowCutLines((v) => !v)}
+                  onSelectSlot={handleSelectSlot}
+                />
+              )}
+            </div>
           </section>
         </main>
 
