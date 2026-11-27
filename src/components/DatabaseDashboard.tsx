@@ -2,10 +2,13 @@ import React, { useMemo, useState } from 'react';
 import {
   ArrowLeft,
   BookUser,
+  Calendar,
+  CheckCircle2,
   ClipboardList,
   Database,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   History,
   Lock,
   LogIn,
@@ -30,6 +33,12 @@ import {
   SuratJalanData,
 } from '../types';
 import { ADMIN_USERNAME, loginAdmin, logoutAdmin } from '../utils/adminAuth';
+import {
+  downloadDatabaseReportExcel,
+  ExportPeriodMode,
+  filterHistoryByPeriod,
+  INDONESIAN_MONTHS,
+} from '../utils/exportExcel';
 
 type DbTableTab = 'history' | 'recipients' | 'items';
 
@@ -84,6 +93,62 @@ export const DatabaseDashboard: React.FC<DatabaseDashboardProps> = ({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [detailRecord, setDetailRecord] = useState<ShipmentRecord | null>(null);
+
+  // Excel Period Export state
+  const now = new Date();
+  const [exportMode, setExportMode] = useState<ExportPeriodMode>('month');
+  const [exportMonth, setExportMonth] = useState<number>(() => now.getMonth() + 1);
+  const [exportYear, setExportYear] = useState<number>(() => now.getFullYear());
+  const [exportNotice, setExportNotice] = useState<{
+    type: 'success' | 'info';
+    text: string;
+  } | null>(null);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>([new Date().getFullYear()]);
+    history.forEach((h) => {
+      const y = new Date(h.createdAt).getFullYear();
+      if (!Number.isNaN(y)) years.add(y);
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [history]);
+
+  const periodHistory = useMemo(
+    () =>
+      filterHistoryByPeriod(history, {
+        mode: exportMode,
+        year: exportYear,
+        month: exportMonth,
+      }),
+    [history, exportMode, exportYear, exportMonth]
+  );
+
+  const handleDownloadPeriodExcel = () => {
+    if (periodHistory.length === 0) {
+      const label =
+        exportMode === 'month'
+          ? `${INDONESIAN_MONTHS[exportMonth - 1]} ${exportYear}`
+          : `Tahun ${exportYear}`;
+      setExportNotice({
+        type: 'info',
+        text: `Belum ada transaksi pada ${label}. Pilih bulan/tahun lain yang memiliki data.`,
+      });
+      return;
+    }
+
+    const { filename, count } = downloadDatabaseReportExcel({
+      history,
+      recipients,
+      items,
+      mode: exportMode,
+      year: exportYear,
+      month: exportMonth,
+    });
+    setExportNotice({
+      type: 'success',
+      text: `Berhasil mengunduh ${filename} (${count} transaksi, 4 sheet lengkap & berwarna).`,
+    });
+  };
 
   const filteredHistory = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -397,6 +462,135 @@ export const DatabaseDashboard: React.FC<DatabaseDashboardProps> = ({
                   Nama pesanan otomatis
                 </p>
               </div>
+            </div>
+
+            {/* Excel Export Bar (Per Bulan / Per Tahun) */}
+            <div className="rounded-2xl border border-emerald-200/80 dark:border-white/15 bg-white/80 dark:bg-white/[0.06] backdrop-blur-xl p-4 shadow-sm space-y-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
+                      Download Laporan Excel Database
+                    </h2>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Pilih rekap <span className="font-semibold">Per Bulan</span> atau{' '}
+                      <span className="font-semibold">Per Tahun</span> (otomatis rapi, berwarna &amp; berisi 4 sheet lengkap).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Period Mode Toggle */}
+                  <div className="inline-flex rounded-full border border-emerald-200 dark:border-white/15 bg-emerald-50/80 dark:bg-black/25 p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportMode('month');
+                        setExportNotice(null);
+                      }}
+                      className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                        exportMode === 'month'
+                          ? 'bg-orange-500 text-white shadow-xs'
+                          : 'text-emerald-900 dark:text-slate-300'
+                      }`}
+                    >
+                      Per Bulan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportMode('year');
+                        setExportNotice(null);
+                      }}
+                      className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                        exportMode === 'year'
+                          ? 'bg-orange-500 text-white shadow-xs'
+                          : 'text-emerald-900 dark:text-slate-300'
+                      }`}
+                    >
+                      Per Tahun
+                    </button>
+                  </div>
+
+                  {/* Month Picker (when Per Bulan) */}
+                  {exportMode === 'month' && (
+                    <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 dark:border-white/15 bg-white dark:bg-black/25 px-2.5 py-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <select
+                        value={exportMonth}
+                        onChange={(e) => {
+                          setExportMonth(Number(e.target.value));
+                          setExportNotice(null);
+                        }}
+                        aria-label="Pilih bulan laporan Excel"
+                        className="bg-transparent text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {INDONESIAN_MONTHS.map((mName, idx) => (
+                          <option
+                            key={mName}
+                            value={idx + 1}
+                            className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                          >
+                            {mName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Year Picker */}
+                  <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 dark:border-white/15 bg-white dark:bg-black/25 px-2.5 py-1.5">
+                    <select
+                      value={exportYear}
+                      onChange={(e) => {
+                        setExportYear(Number(e.target.value));
+                        setExportNotice(null);
+                      }}
+                      aria-label="Pilih tahun laporan Excel"
+                      className="bg-transparent text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                    >
+                      {availableYears.map((yr) => (
+                        <option
+                          key={yr}
+                          value={yr}
+                          className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                        >
+                          {yr}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <span className="rounded-full bg-emerald-500/15 dark:bg-emerald-500/25 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:text-emerald-200 tabular-nums">
+                    {periodHistory.length} transaksi
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadPeriodExcel}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-extrabold text-white hover:from-emerald-400 hover:to-teal-400 shadow-[0_4px_14px_rgba(16,185,129,0.35)] transition-all"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    Download Excel
+                  </button>
+                </div>
+              </div>
+
+              {exportNotice && (
+                <div
+                  className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold ${
+                    exportNotice.type === 'success'
+                      ? 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border border-emerald-400/30'
+                      : 'bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-400/30'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span>{exportNotice.text}</span>
+                </div>
+              )}
             </div>
 
             {/* Database Panel */}

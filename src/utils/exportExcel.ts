@@ -6,7 +6,16 @@ import {
   isResiFilled,
   parseIndonesianNumber,
 } from '../constants';
-import { KelompokColorId, ResiItem, SenderHeader, SuratJalanData } from '../types';
+import {
+  KelompokColorId,
+  ResiItem,
+  SavedItemSuggestion,
+  SavedRecipient,
+  SenderHeader,
+  ShipmentActionType,
+  ShipmentRecord,
+  SuratJalanData,
+} from '../types';
 import { buildTimestamp } from './exportSheet';
 
 type CellStyle = XLSX.CellStyle;
@@ -598,4 +607,495 @@ export function downloadSuratJalanExcel(
   triggerExcelDownload(workbook, filename);
 
   return filename;
+}
+
+export type ExportPeriodMode = 'month' | 'year';
+
+export const INDONESIAN_MONTHS = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+] as const;
+
+const DB_ACTION_LABELS: Record<ShipmentActionType, string> = {
+  save: 'Disimpan',
+  print: 'Dicetak',
+  pdf: 'Unduh PDF',
+  excel: 'Unduh Excel',
+};
+
+function formatDateTimeShort(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+function getDocBadgeStyle(docType: 'resi' | 'surat_jalan'): CellStyle {
+  return docType === 'surat_jalan'
+    ? {
+        fill: { fgColor: { rgb: 'FFEDD5' } },
+        font: { name: FONT_NAME, sz: 10, bold: true, color: { rgb: '9A3412' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: BORDER_THIN,
+      }
+    : {
+        fill: { fgColor: { rgb: 'D1FAE5' } },
+        font: { name: FONT_NAME, sz: 10, bold: true, color: { rgb: '065F46' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: BORDER_THIN,
+      };
+}
+
+function getActionBadgeStyle(action: ShipmentActionType | undefined): CellStyle {
+  const palette: Record<ShipmentActionType, { bg: string; fg: string }> = {
+    save: { bg: 'E0F2FE', fg: '075985' },
+    print: { bg: 'FEF3C7', fg: '92400E' },
+    pdf: { bg: 'FCE7F3', fg: '9D174D' },
+    excel: { bg: 'DCFCE7', fg: '166534' },
+  };
+  const chosen = palette[action ?? 'save'] ?? palette.save;
+  return {
+    fill: { fgColor: { rgb: chosen.bg } },
+    font: { name: FONT_NAME, sz: 10, bold: true, color: { rgb: chosen.fg } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: BORDER_THIN,
+  };
+}
+
+function getUsageBadgeStyle(rowIndex: number): CellStyle {
+  return {
+    fill: { fgColor: { rgb: rowIndex % 2 === 1 ? 'FFEDD5' : 'FEF3C7' } },
+    font: { name: FONT_NAME, sz: 10, bold: true, color: { rgb: '9A3412' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: BORDER_THIN,
+  };
+}
+
+/**
+ * Filters shipment history by calendar month or full year in local time.
+ */
+export function filterHistoryByPeriod(
+  history: ShipmentRecord[],
+  options: { mode: ExportPeriodMode; year: number; month: number }
+): ShipmentRecord[] {
+  return history.filter((rec) => {
+    const dt = new Date(rec.createdAt);
+    if (Number.isNaN(dt.getTime())) return false;
+    const recYear = dt.getFullYear();
+    const recMonth = dt.getMonth() + 1;
+    if (recYear !== options.year) return false;
+    if (options.mode === 'month' && recMonth !== options.month) return false;
+    return true;
+  });
+}
+
+function summarizeRecordItems(rec: ShipmentRecord): string {
+  if (rec.docType === 'resi') {
+    const lines: string[] = [];
+    (rec.payload as ResiItem[]).forEach((item, idx) => {
+      const penerima = item.kepada.split('\n')[0]?.trim() || `Resi #${idx + 1}`;
+      const rows = getResiBottomRows(item)
+        .filter((r) => r.namaBarang.trim() || r.qty.trim())
+        .map((r) => {
+          const qtyPart = r.useQty !== false && r.qty.trim() ? ` (${r.qty.trim()})` : '';
+          return `${r.namaBarang.trim()}${qtyPart}`;
+        });
+      if (rows.length > 0) {
+        lines.push(`${penerima}: ${rows.join(', ')}`);
+      }
+    });
+    return lines.join('\n') || '-';
+  }
+
+  const lines: string[] = [];
+  (rec.payload as SuratJalanData[]).forEach((sj, idx) => {
+    const penerima = sj.kepada.trim() || `SJ #${idx + 1}`;
+    const rows = sj.rows
+      .filter((r) => r.namaBarang.trim())
+      .map((r) => {
+        const qtyPart = r.qty.trim() ? ` (QTY ${r.qty.trim()})` : '';
+        return `${r.namaBarang.trim()}${qtyPart}`;
+      });
+    if (rows.length > 0) {
+      lines.push(`${penerima}: ${rows.join(', ')}`);
+    }
+  });
+  return lines.join('\n') || '-';
+}
+
+function buildStyledSheet(params: {
+  title: string;
+  subtitle: string;
+  headers: string[];
+  rows: Array<Array<string | number>>;
+  totalRow?: Array<string | number>;
+  colWidths: number[];
+  centerCols: Set<number>;
+  boldCols?: Set<number>;
+  customCellStyle?: (
+    rowIdx: number,
+    colIdx: number
+  ) => CellStyle | undefined;
+}): XLSX.WorkSheet {
+  const {
+    title,
+    subtitle,
+    headers,
+    rows,
+    totalRow,
+    colWidths,
+    centerCols,
+    boldCols = new Set([0]),
+    customCellStyle,
+  } = params;
+
+  const aoa: Array<Array<string | number>> = [
+    [title],
+    [subtitle],
+    [],
+    headers,
+    ...rows,
+  ];
+  if (totalRow) {
+    aoa.push(totalRow);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const lastCol = headers.length - 1;
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
+  ];
+  ws['!cols'] = colWidths.map((wch) => ({ wch }));
+
+  styleRange(ws, 0, 0, 0, lastCol, STYLE_BANNER);
+  styleRange(ws, 1, 1, 0, lastCol, STYLE_SUBTITLE);
+  styleRange(ws, 3, 3, 0, lastCol, STYLE_TABLE_HEADER);
+
+  rows.forEach((_row, rIdx) => {
+    const excelRow = 4 + rIdx;
+    for (let c = 0; c <= lastCol; c += 1) {
+      const override = customCellStyle?.(rIdx, c);
+      if (override) {
+        setCellStyle(ws, excelRow, c, override);
+      } else {
+        setCellStyle(
+          ws,
+          excelRow,
+          c,
+          getDataCellStyle(rIdx, centerCols.has(c) ? 'center' : 'left', boldCols.has(c))
+        );
+      }
+    }
+  });
+
+  const rowHeights: XLSX.RowInfo[] = [
+    { hpt: 32 },
+    { hpt: 22 },
+    { hpt: 10 },
+    { hpt: 28 },
+    ...rows.map((row) => ({ hpt: estimateRowHeight(row, colWidths, 24) })),
+  ];
+
+  if (totalRow) {
+    const totalRowIdx = 4 + rows.length;
+    styleRange(ws, totalRowIdx, totalRowIdx, 0, lastCol, STYLE_TOTAL_ROW);
+    rowHeights.push({ hpt: 26 });
+  }
+
+  ws['!rows'] = rowHeights;
+  return ws;
+}
+
+/**
+ * Builds a colorful, multi-sheet Excel workbook for the Database Dashboard export.
+ */
+export function buildDatabaseReportWorkbook(params: {
+  history: ShipmentRecord[];
+  recipients: SavedRecipient[];
+  items: SavedItemSuggestion[];
+  periodLabel: string;
+}): XLSX.WorkBook {
+  const { history, recipients, items, periodLabel } = params;
+  const workbook = XLSX.utils.book_new();
+  const exportedAt = formatExportDateLabel();
+
+  const resiCount = history.filter((h) => h.docType === 'resi').length;
+  const sjCount = history.filter((h) => h.docType === 'surat_jalan').length;
+  const totalItemsInPeriod = history.reduce((sum, h) => sum + (h.itemCount || 0), 0);
+  const totalKoliInPeriod = history.reduce((sum, h) => sum + (h.totalKoli || 0), 0);
+
+  // Sheet 1: Rekap Transaksi
+  const summaryRows = history.map((rec, idx) => [
+    idx + 1,
+    formatDateTimeShort(rec.createdAt),
+    rec.docType === 'surat_jalan' ? 'Surat Jalan' : 'Resi',
+    rec.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah',
+    DB_ACTION_LABELS[rec.lastAction ?? 'save'],
+    rec.title,
+    rec.recipientSummary || '-',
+    rec.itemCount,
+    rec.totalKoli,
+    summarizeRecordItems(rec),
+  ]);
+
+  const txWs = buildStyledSheet({
+    title: `LAPORAN DATABASE PENGIRIMAN — ${periodLabel.toUpperCase()}`,
+    subtitle: `Periode: ${periodLabel}  •  Total Transaksi: ${history.length} (${resiCount} Resi, ${sjCount} Surat Jalan)  •  Total Koli: ${formatIndonesianNumber(totalKoliInPeriod)}  •  Diunduh: ${exportedAt}`,
+    headers: [
+      'No',
+      'Tanggal & Waktu',
+      'Jenis Dokumen',
+      'Kop Pengirim',
+      'Status Aksi',
+      'Judul / Tujuan',
+      'Ringkasan Penerima',
+      'Jumlah Resi/SJ',
+      'Total Koli',
+      'Rincian Barang & QTY',
+    ],
+    rows: summaryRows,
+    totalRow: [
+      'TOTAL',
+      '',
+      `${history.length} Transaksi`,
+      '',
+      '',
+      `${resiCount} Resi • ${sjCount} SJ`,
+      '',
+      totalItemsInPeriod,
+      totalKoliInPeriod,
+      '',
+    ],
+    colWidths: [6, 20, 15, 20, 14, 28, 28, 14, 12, 46],
+    centerCols: new Set([0, 1, 2, 3, 4, 7, 8]),
+    boldCols: new Set([0, 5]),
+    customCellStyle: (rIdx, cIdx) => {
+      const rec = history[rIdx];
+      if (!rec) return undefined;
+      if (cIdx === 2) return getDocBadgeStyle(rec.docType);
+      if (cIdx === 4) return getActionBadgeStyle(rec.lastAction);
+      return undefined;
+    },
+  });
+  XLSX.utils.book_append_sheet(workbook, txWs, 'Rekap Transaksi');
+
+  // Sheet 2: Detail Pengiriman per baris Resi / Surat Jalan
+  const detailRows: Array<Array<string | number>> = [];
+  const detailDocTypes: Array<'resi' | 'surat_jalan'> = [];
+  const detailColorIds: Array<KelompokColorId | undefined> = [];
+
+  history.forEach((rec) => {
+    const tanggalLabel = formatDateTimeShort(rec.createdAt);
+    const kopLabel = rec.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah';
+
+    if (rec.docType === 'resi') {
+      (rec.payload as ResiItem[]).forEach((item) => {
+        const lines = item.kepada
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const penerima = lines[0] ?? '-';
+        const alamat = lines.slice(1).join(', ') || '-';
+        const rows = getResiBottomRows(item);
+        const barang = rows.map((r) => r.namaBarang.trim()).filter(Boolean).join('; ') || '-';
+        const qty =
+          rows
+            .map((r) => (r.useQty !== false ? r.qty.trim() : ''))
+            .filter(Boolean)
+            .join('; ') || '-';
+        const cfg = getKelompokColor(rows[0]?.colorId);
+
+        detailRows.push([
+          detailRows.length + 1,
+          tanggalLabel,
+          'Resi',
+          kopLabel,
+          penerima,
+          alamat,
+          item.noHp.trim() || '-',
+          cfg.label,
+          barang,
+          qty,
+          `Koli ${item.koliKe || '-'} / ${item.dari || '-'}`,
+        ]);
+        detailDocTypes.push('resi');
+        detailColorIds.push(rows[0]?.colorId);
+      });
+    } else {
+      (rec.payload as SuratJalanData[]).forEach((sj) => {
+        const activeRows = sj.rows.filter(
+          (r) => r.namaBarang.trim() || r.qty.trim() || r.jumlahKoli.trim()
+        );
+        const targetRows = activeRows.length > 0 ? activeRows : sj.rows;
+        targetRows.forEach((row) => {
+          detailRows.push([
+            detailRows.length + 1,
+            sj.tanggal.trim() || tanggalLabel,
+            'Surat Jalan',
+            kopLabel,
+            sj.kepada.trim() || '-',
+            sj.alamat.trim().replace(/\n/g, ', ') || '-',
+            sj.telepon.trim() || '-',
+            sj.nomor.trim() || '-',
+            row.namaBarang.trim() || '-',
+            row.qty.trim() || '-',
+            row.jumlahKoli.trim()
+              ? `${row.jumlahKoli.trim()} Koli${
+                  row.keterangan.trim() ? ` (${row.keterangan.trim()})` : ''
+                }`
+              : row.keterangan.trim() || '-',
+          ]);
+          detailDocTypes.push('surat_jalan');
+          detailColorIds.push(undefined);
+        });
+      });
+    }
+  });
+
+  const detailWs = buildStyledSheet({
+    title: `DETAIL BARANG & PENERIMA — ${periodLabel.toUpperCase()}`,
+    subtitle: `Rincian ${detailRows.length} baris pengiriman dalam periode ${periodLabel}  •  Diunduh: ${exportedAt}`,
+    headers: [
+      'No',
+      'Tanggal',
+      'Jenis',
+      'Kop',
+      'Penerima / Instansi',
+      'Alamat Tujuan',
+      'No. HP / Telp',
+      'Kelompok / No. SJ',
+      'Nama Barang',
+      'QTY',
+      'Koli / Keterangan',
+    ],
+    rows: detailRows,
+    colWidths: [6, 19, 13, 19, 26, 36, 16, 18, 34, 11, 22],
+    centerCols: new Set([0, 1, 2, 3, 6, 7, 9]),
+    boldCols: new Set([0, 4]),
+    customCellStyle: (rIdx, cIdx) => {
+      if (cIdx === 2) return getDocBadgeStyle(detailDocTypes[rIdx] ?? 'resi');
+      if (cIdx === 7 && detailDocTypes[rIdx] === 'resi') {
+        return getKelompokBadgeStyle(detailColorIds[rIdx]);
+      }
+      return undefined;
+    },
+  });
+  XLSX.utils.book_append_sheet(workbook, detailWs, 'Detail Pengiriman');
+
+  // Sheet 3: Buku Alamat
+  const recRows = recipients.map((rec, idx) => [
+    idx + 1,
+    rec.recipientName,
+    rec.address ? rec.address.replace(/\n/g, ', ') : '-',
+    rec.phone || '-',
+    rec.lastItemName || '-',
+    `${rec.useCount}x`,
+    formatDateTimeShort(rec.lastUsedAt),
+  ]);
+
+  const recWs = buildStyledSheet({
+    title: 'BUKU ALAMAT PELANGGAN TERSIMPAN',
+    subtitle: `Total ${recipients.length} penerima/instansi terdaftar  •  Diunduh: ${exportedAt}`,
+    headers: [
+      'No',
+      'Nama Penerima / Instansi',
+      'Alamat Lengkap',
+      'No. HP / Telepon',
+      'Barang Terakhir',
+      'Frekuensi',
+      'Terakhir Dipakai',
+    ],
+    rows: recRows,
+    colWidths: [6, 28, 42, 18, 32, 12, 20],
+    centerCols: new Set([0, 3, 5, 6]),
+    boldCols: new Set([0, 1]),
+    customCellStyle: (rIdx, cIdx) => (cIdx === 5 ? getUsageBadgeStyle(rIdx) : undefined),
+  });
+  XLSX.utils.book_append_sheet(workbook, recWs, 'Buku Alamat');
+
+  // Sheet 4: Katalog Barang
+  const catalogRows = items.map((it, idx) => {
+    const cfg = getKelompokColor(it.defaultColorId);
+    return [
+      idx + 1,
+      it.itemName,
+      `${cfg.label} (${cfg.colorName})`,
+      `${it.useCount}x`,
+      formatDateTimeShort(it.lastUsedAt),
+    ];
+  });
+
+  const catWs = buildStyledSheet({
+    title: 'KATALOG BARANG PENGIRIMAN',
+    subtitle: `Total ${items.length} jenis barang tercatat otomatis  •  Diunduh: ${exportedAt}`,
+    headers: ['No', 'Nama Barang', 'Kelompok Warna', 'Dipakai', 'Terakhir Dipakai'],
+    rows: catalogRows,
+    colWidths: [6, 40, 24, 12, 20],
+    centerCols: new Set([0, 2, 3, 4]),
+    boldCols: new Set([0, 1]),
+    customCellStyle: (rIdx, cIdx) => {
+      if (cIdx === 2) return getKelompokBadgeStyle(items[rIdx]?.defaultColorId);
+      if (cIdx === 3) return getUsageBadgeStyle(rIdx);
+      return undefined;
+    },
+  });
+  XLSX.utils.book_append_sheet(workbook, catWs, 'Katalog Barang');
+
+  return workbook;
+}
+
+/**
+ * Generates and downloads a styled multi-sheet Excel database report for a chosen month or year.
+ */
+export function downloadDatabaseReportExcel(params: {
+  history: ShipmentRecord[];
+  recipients: SavedRecipient[];
+  items: SavedItemSuggestion[];
+  mode: ExportPeriodMode;
+  year: number;
+  month: number;
+}): { filename: string; count: number } {
+  const filteredHistory = filterHistoryByPeriod(params.history, {
+    mode: params.mode,
+    year: params.year,
+    month: params.month,
+  });
+
+  const monthName = INDONESIAN_MONTHS[params.month - 1] ?? String(params.month);
+  const periodLabel =
+    params.mode === 'month' ? `${monthName} ${params.year}` : `Tahun ${params.year}`;
+
+  const workbook = buildDatabaseReportWorkbook({
+    history: filteredHistory,
+    recipients: params.recipients,
+    items: params.items,
+    periodLabel,
+  });
+
+  const slug =
+    params.mode === 'month'
+      ? `bulanan-${params.year}-${String(params.month).padStart(2, '0')}`
+      : `tahunan-${params.year}`;
+  const filename = `laporan-database-resi-${slug}.xlsx`;
+
+  triggerExcelDownload(workbook, filename);
+  return { filename, count: filteredHistory.length };
 }
