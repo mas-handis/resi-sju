@@ -664,15 +664,12 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
             </div>
           </div>
 
-          {/* Auto-Generate Koli 1 s/d N + Auto Multi-Page A4 */}
+          {/* Auto-Generate Koli 1 s/d N */}
           <div className="pt-2.5 border-t border-emerald-200/70 dark:border-white/10">
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-900 dark:text-emerald-200">
                 <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 Otomatis Banyak Koli
-              </span>
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                Kertas A4 menyesuaikan otomatis
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -727,11 +724,7 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:from-orange-400 hover:to-amber-400 disabled:opacity-45 disabled:pointer-events-none shadow-[0_4px_14px_rgba(249,115,22,0.35)] transition-all"
               >
                 <Zap className="w-3.5 h-3.5 text-amber-300" />
-                {validBatchCount
-                  ? `Buat Otomatis 1–${parsedBatchCount} Koli (${Math.ceil(
-                      parsedBatchCount / 4
-                    )} Hal)`
-                  : 'Isi 2–100 Koli'}
+                {validBatchCount ? 'Buat Otomatis' : 'Isi 2–100 Koli'}
               </button>
             </div>
           </div>
