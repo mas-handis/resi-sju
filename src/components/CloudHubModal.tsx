@@ -1,43 +1,29 @@
 import React, { useMemo, useState } from 'react';
-import { User } from '@supabase/supabase-js';
 import {
   BookUser,
-  CheckCircle2,
   ClipboardList,
-  Cloud,
-  CloudOff,
   History,
   Loader2,
-  LogIn,
-  LogOut,
   MapPin,
   Package,
   Phone,
   Plus,
-  RefreshCw,
   Search,
   Star,
   Trash2,
-  UploadCloud,
-  UserPlus,
   X,
 } from 'lucide-react';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { AppMode, SavedRecipient, ShipmentRecord } from '../types';
 
-export type CloudHubTab = 'addresses' | 'history' | 'account';
+export type CloudHubTab = 'addresses' | 'history';
 
 interface CloudHubModalProps {
   isOpen: boolean;
   initialTab?: CloudHubTab;
   onClose: () => void;
-  user: User | null;
   recipients: SavedRecipient[];
   history: ShipmentRecord[];
-  isSyncing: boolean;
   appMode: AppMode;
-  onRefreshCloud: () => Promise<void>;
-  onSyncLocalToCloud: () => Promise<void>;
   onSaveRecipientManual: (input: {
     recipientName: string;
     address: string;
@@ -54,13 +40,9 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
   isOpen,
   initialTab = 'addresses',
   onClose,
-  user,
   recipients,
   history,
-  isSyncing,
   appMode,
-  onRefreshCloud,
-  onSyncLocalToCloud,
   onSaveRecipientManual,
   onUseRecipient,
   onDeleteRecipient,
@@ -79,20 +61,9 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
   const [newItem, setNewItem] = useState('');
   const [savingManual, setSavingManual] = useState(false);
 
-  // Auth form
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authMessage, setAuthMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
-
   React.useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
-      setAuthMessage(null);
     }
   }, [isOpen, initialTab]);
 
@@ -143,63 +114,6 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
     }
   };
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supabase || !email.trim() || !password) return;
-    setAuthLoading(true);
-    setAuthMessage(null);
-    try {
-      if (authMode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (error) throw error;
-        setAuthMessage({
-          type: 'success',
-          text: 'Berhasil masuk! Data Cloud sedang disinkronkan.',
-        });
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-        });
-        if (error) throw error;
-        if (data.session) {
-          setAuthMessage({
-            type: 'success',
-            text: 'Akun berhasil dibuat & langsung terhubung ke Supabase!',
-          });
-        } else {
-          setAuthMessage({
-            type: 'success',
-            text: 'Pendaftaran berhasil! Silakan cek inbox email Anda untuk konfirmasi sebelum masuk.',
-          });
-        }
-      }
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Gagal menghubungi server Supabase.';
-      setAuthMessage({ type: 'error', text: msg });
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    if (!supabase) return;
-    setAuthLoading(true);
-    try {
-      await supabase.auth.signOut();
-      setAuthMessage({
-        type: 'success',
-        text: 'Berhasil keluar dari akun Cloud.',
-      });
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
   const formatDateTime = (iso: string) => {
     try {
       return new Intl.DateTimeFormat('id-ID', {
@@ -227,16 +141,14 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 bg-gradient-to-r from-emerald-500/15 to-orange-500/15 dark:from-emerald-500/20 dark:to-orange-500/15 border-b border-emerald-200/70 dark:border-white/10">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-orange-500 text-white flex items-center justify-center shadow-sm flex-shrink-0">
-              {user ? <Cloud className="w-4 h-4" /> : <BookUser className="w-4 h-4" />}
+              <BookUser className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white truncate">
-                Database Cloud &amp; Rekomendasi Alamat
+                Buku Alamat &amp; Riwayat Pengiriman
               </h2>
               <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 truncate">
-                {user
-                  ? `Terhubung ke Supabase (${user.email})`
-                  : 'Mode Lokal Aktif • Masuk akun Cloud untuk sinkronisasi antar perangkat'}
+                Rekomendasi alamat otomatis &amp; arsip pengiriman tersimpan di perangkat
               </p>
             </div>
           </div>
@@ -276,18 +188,6 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
           >
             <History className="w-3.5 h-3.5" />
             Riwayat Pengiriman ({history.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('account')}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'account'
-                ? 'bg-gradient-to-r from-emerald-500 to-orange-500 text-white shadow-sm'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-white/10'
-            }`}
-          >
-            {user ? <Cloud className="w-3.5 h-3.5" /> : <CloudOff className="w-3.5 h-3.5" />}
-            Akun Cloud
           </button>
         </div>
 
@@ -567,164 +467,6 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
                 </div>
               )}
             </>
-          )}
-
-          {activeTab === 'account' && (
-            <div className="space-y-4">
-              {!isSupabaseConfigured ? (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
-                  Konfigurasi Supabase (`VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`) belum terpasang di environment build ini.
-                </div>
-              ) : user ? (
-                <div className="rounded-2xl border border-emerald-200 dark:border-emerald-400/30 bg-emerald-50/70 dark:bg-emerald-500/10 p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">
-                        Sinkronisasi Cloud Aktif
-                      </p>
-                      <p className="text-xs text-emerald-800 dark:text-emerald-200">
-                        Login sebagai <span className="font-bold">{user.email}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
-                    Semua buku alamat, rekomendasi barang, dan riwayat pengiriman tersimpan aman di database Supabase dengan Row Level Security (hanya akun Anda yang bisa mengakses).
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      disabled={isSyncing}
-                      onClick={() => void onRefreshCloud()}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
-                    >
-                      <RefreshCw
-                        className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`}
-                      />
-                      Refresh Data Cloud
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isSyncing}
-                      onClick={() => void onSyncLocalToCloud()}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 dark:border-white/20 bg-white dark:bg-white/10 px-3.5 py-2 text-xs font-bold text-emerald-900 dark:text-white hover:bg-emerald-50 dark:hover:bg-white/20 disabled:opacity-50"
-                    >
-                      <UploadCloud className="w-3.5 h-3.5" />
-                      Unggah Cache Lokal ke Cloud
-                    </button>
-                    <button
-                      type="button"
-                      disabled={authLoading}
-                      onClick={() => void handleSignOut()}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-rose-300 dark:border-rose-400/30 bg-rose-50 dark:bg-rose-500/20 px-3.5 py-2 text-xs font-bold text-rose-700 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-500/30"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      Keluar
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <form
-                  onSubmit={handleAuthSubmit}
-                  className="rounded-2xl border border-emerald-200 dark:border-white/15 bg-white dark:bg-white/[0.04] p-4 sm:p-5 space-y-3.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                        {authMode === 'login'
-                          ? 'Masuk ke Akun Supabase Cloud'
-                          : 'Daftar Akun Supabase Baru'}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Sinkronkan alamat &amp; riwayat pengiriman di semua komputer/HP admin &amp; gudang.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="inline-flex rounded-full bg-emerald-100/80 dark:bg-black/30 p-1 border border-emerald-200/70 dark:border-white/10">
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode('login')}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold ${
-                        authMode === 'login'
-                          ? 'bg-emerald-500 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      <LogIn className="w-3.5 h-3.5" />
-                      Masuk
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode('signup')}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold ${
-                        authMode === 'signup'
-                          ? 'bg-orange-500 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      Daftar Baru
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-emerald-900 dark:text-emerald-200 mb-1">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="admin@suaramuhammadiyah.id"
-                        className="w-full rounded-lg border border-emerald-200 dark:border-white/15 bg-white dark:bg-black/25 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-orange-400 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-emerald-900 dark:text-emerald-200 mb-1">
-                        Password
-                      </label>
-                      <input
-                        type="password"
-                        required
-                        minLength={6}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Minimal 6 karakter"
-                        className="w-full rounded-lg border border-emerald-200 dark:border-white/15 bg-white dark:bg-black/25 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-orange-400 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {authMessage && (
-                    <div
-                      className={`rounded-xl px-3 py-2 text-xs font-medium ${
-                        authMessage.type === 'success'
-                          ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 border border-emerald-400/30'
-                          : 'bg-rose-500/15 text-rose-800 dark:text-rose-200 border border-rose-400/30'
-                      }`}
-                    >
-                      {authMessage.text}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={authLoading}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-orange-500 px-5 py-2 text-xs font-extrabold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
-                  >
-                    {authLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    {authMode === 'login' ? 'Masuk ke Cloud' : 'Buat Akun Cloud'}
-                  </button>
-                </form>
-              )}
-            </div>
           )}
         </div>
       </div>

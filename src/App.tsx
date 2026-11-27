@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { User } from '@supabase/supabase-js';
 import {
   BookUser,
   CheckCircle2,
   ClipboardList,
-  Cloud,
   Eye,
   FileDown,
   FileSpreadsheet,
@@ -40,11 +38,9 @@ import {
   RESI_PER_PAGE,
   SURAT_JALAN_SENDER_PRESETS,
 } from './constants';
-import { supabase } from './lib/supabase';
 import {
   deleteSavedRecipient,
   deleteShipmentRecord,
-  fetchCloudBundle,
   learnFromResiBatch,
   learnFromSuratJalanBatch,
   loadLocalHistory,
@@ -52,7 +48,6 @@ import {
   loadLocalRecipients,
   recordRecipientUsage,
   saveShipmentRecord,
-  syncLocalCacheToCloud,
 } from './services/backendSync';
 import {
   AppMode,
@@ -95,7 +90,6 @@ export function App() {
   });
   const [exportingType, setExportingType] = useState<'pdf' | 'excel' | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [authUser, setAuthUser] = useState<User | null>(null);
   const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>(() =>
     loadLocalRecipients()
   );
@@ -107,7 +101,6 @@ export function App() {
   );
   const [cloudModalOpen, setCloudModalOpen] = useState(false);
   const [cloudInitialTab, setCloudInitialTab] = useState<CloudHubTab>('addresses');
-  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [isSavingCloud, setIsSavingCloud] = useState(false);
 
   const reloadLocalStores = useCallback(() => {
@@ -115,50 +108,6 @@ export function App() {
     setSavedItems(loadLocalItemCatalog());
     setShipmentHistory(loadLocalHistory());
   }, []);
-
-  const refreshCloudData = useCallback(async () => {
-    setIsSyncingCloud(true);
-    try {
-      const bundle = await fetchCloudBundle();
-      setSavedRecipients(bundle.recipients);
-      setSavedItems(bundle.items);
-      setShipmentHistory(bundle.history);
-    } catch (err) {
-      console.error('Gagal mengambil data cloud:', err);
-      reloadLocalStores();
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  }, [reloadLocalStores]);
-
-  useEffect(() => {
-    if (!supabase) return;
-    let active = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      const u = data.session?.user ?? null;
-      setAuthUser(u);
-      if (u) {
-        void refreshCloudData();
-      }
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const u = session?.user ?? null;
-      setAuthUser(u);
-      if (u) {
-        void refreshCloudData();
-      } else {
-        reloadLocalStores();
-      }
-    });
-
-    return () => {
-      active = false;
-      authListener.subscription.unsubscribe();
-    };
-  }, [refreshCloudData, reloadLocalStores]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', themeMode === 'dark');
@@ -452,18 +401,13 @@ export function App() {
   };
 
   const learnCurrentBatch = async () => {
-    const isAuth = Boolean(authUser);
     try {
       if (appMode === 'surat_jalan') {
-        await learnFromSuratJalanBatch(suratJalanList, isAuth);
+        await learnFromSuratJalanBatch(suratJalanList, false);
       } else {
-        await learnFromResiBatch(resiList, isAuth);
+        await learnFromResiBatch(resiList, false);
       }
-      if (isAuth) {
-        await refreshCloudData();
-      } else {
-        reloadLocalStores();
-      }
+      reloadLocalStores();
     } catch (err) {
       console.error('Learn batch failed:', err);
     }
@@ -472,7 +416,6 @@ export function App() {
   const handleSaveToDatabase = async () => {
     if (isSavingCloud) return;
     setIsSavingCloud(true);
-    const isAuth = Boolean(authUser);
     try {
       const currentSender = appMode === 'surat_jalan' ? sjSender : sender;
       await saveShipmentRecord(
@@ -482,18 +425,10 @@ export function App() {
           resiList,
           suratJalanList,
         },
-        isAuth
+        false
       );
-      if (isAuth) {
-        await refreshCloudData();
-      } else {
-        reloadLocalStores();
-      }
-      showToast(
-        isAuth
-          ? 'Tersimpan ke Database Supabase & Buku Alamat diperbarui.'
-          : 'Tersimpan di perangkat & Buku Alamat diperbarui (masuk Cloud untuk sinkron).'
-      );
+      reloadLocalStores();
+      showToast('Tersimpan ke Riwayat & Buku Alamat diperbarui.');
     } catch (err) {
       console.error('Save record failed:', err);
       showToast('Gagal menyimpan ke database.');
@@ -707,13 +642,9 @@ export function App() {
                 setCloudModalOpen(true);
               }}
               className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-bold text-emerald-900 dark:text-white hover:bg-white dark:hover:bg-white/20 transition-colors shadow-xs"
-              title="Buka Buku Alamat, Riwayat Pengiriman & Akun Cloud Supabase"
+              title="Buka Buku Alamat & Riwayat Pengiriman"
             >
-              {authUser ? (
-                <Cloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              ) : (
-                <BookUser className="w-3.5 h-3.5 text-orange-600 dark:text-orange-300" />
-              )}
+              <BookUser className="w-3.5 h-3.5 text-orange-600 dark:text-orange-300" />
               <span className="hidden md:inline">Database</span>
               <span className="rounded-full bg-emerald-500/15 dark:bg-emerald-500/30 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:text-emerald-200">
                 {savedRecipients.length}
@@ -1027,54 +958,29 @@ export function App() {
         )}
       </div>
 
-      {/* Cloud Database, Address Book & History Modal */}
+      {/* Address Book & History Modal */}
       <CloudHubModal
         isOpen={cloudModalOpen}
         initialTab={cloudInitialTab}
         onClose={() => setCloudModalOpen(false)}
-        user={authUser}
         recipients={savedRecipients}
         history={shipmentHistory}
-        isSyncing={isSyncingCloud}
         appMode={appMode}
-        onRefreshCloud={refreshCloudData}
-        onSyncLocalToCloud={async () => {
-          setIsSyncingCloud(true);
-          try {
-            await syncLocalCacheToCloud();
-            await refreshCloudData();
-            showToast('Data lokal berhasil disinkronkan ke Supabase Cloud.');
-          } finally {
-            setIsSyncingCloud(false);
-          }
-        }}
         onSaveRecipientManual={async (input) => {
-          await recordRecipientUsage(input, Boolean(authUser));
-          if (authUser) {
-            await refreshCloudData();
-          } else {
-            reloadLocalStores();
-          }
+          await recordRecipientUsage(input, false);
+          reloadLocalStores();
           showToast(`Alamat "${input.recipientName}" disimpan ke Buku Alamat.`);
         }}
         onUseRecipient={handleUseSavedRecipient}
         onDeleteRecipient={async (id) => {
-          await deleteSavedRecipient(id, Boolean(authUser));
-          if (authUser) {
-            await refreshCloudData();
-          } else {
-            reloadLocalStores();
-          }
+          await deleteSavedRecipient(id, false);
+          reloadLocalStores();
           showToast('Alamat dihapus.');
         }}
         onLoadRecord={handleLoadShipmentRecord}
         onDeleteRecord={async (id) => {
-          await deleteShipmentRecord(id, Boolean(authUser));
-          if (authUser) {
-            await refreshCloudData();
-          } else {
-            reloadLocalStores();
-          }
+          await deleteShipmentRecord(id, false);
+          reloadLocalStores();
           showToast('Riwayat dihapus.');
         }}
       />
