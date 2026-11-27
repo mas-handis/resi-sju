@@ -24,7 +24,21 @@ import {
   parseIndonesianNumber,
   SURAT_JALAN_SENDER_PRESETS,
 } from '../constants';
-import { SenderHeader, SuratJalanData, SuratJalanRow } from '../types';
+import {
+  filterItemSuggestions,
+  filterRecipientSuggestions,
+} from '../services/backendSync';
+import {
+  SavedItemSuggestion,
+  SavedRecipient,
+  SenderHeader,
+  SuratJalanData,
+  SuratJalanRow,
+} from '../types';
+import {
+  ItemSuggestionsDropdown,
+  RecipientSuggestionsDropdown,
+} from './AutocompleteSuggestions';
 import { SenderHeaderCard } from './SenderHeaderCard';
 
 interface SuratJalanFormProps {
@@ -32,6 +46,8 @@ interface SuratJalanFormProps {
   activeId: string | null;
   sender: SenderHeader;
   hasResiData: boolean;
+  savedRecipients?: SavedRecipient[];
+  savedItems?: SavedItemSuggestion[];
   onSenderChange: (next: SenderHeader) => void;
   onFocus: (id: string) => void;
   onChange: (id: string, patch: Partial<SuratJalanData>) => void;
@@ -50,6 +66,8 @@ interface SuratJalanCardProps {
   isCollapsed: boolean;
   sender: SenderHeader;
   hasResiData: boolean;
+  savedRecipients: SavedRecipient[];
+  savedItems: SavedItemSuggestion[];
   onToggleCollapse: () => void;
   onFocus: () => void;
   onChange: (patch: Partial<SuratJalanData>) => void;
@@ -68,6 +86,8 @@ const SuratJalanCard: React.FC<SuratJalanCardProps> = ({
   isCollapsed,
   sender,
   hasResiData,
+  savedRecipients,
+  savedItems,
   onToggleCollapse,
   onFocus,
   onChange,
@@ -77,6 +97,8 @@ const SuratJalanCard: React.FC<SuratJalanCardProps> = ({
   onMoveDown,
   onCopyFromResi,
 }) => {
+  const [recipientFocused, setRecipientFocused] = useState(false);
+  const [focusedRowItemId, setFocusedRowItemId] = useState<string | null>(null);
   const totalQty = data.rows.reduce(
     (sum, r) => sum + parseIndonesianNumber(r.qty),
     0
@@ -320,8 +342,8 @@ const SuratJalanCard: React.FC<SuratJalanCardProps> = ({
       </div>
 
       {/* 3. Tujuan Pengiriman */}
-      <div className="rounded-2xl border border-emerald-200/80 bg-white/75 dark:border-white/15 dark:bg-white/[0.06] backdrop-blur-xl shadow-[0_8px_28px_rgba(16,185,129,0.08)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.28)] overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500/15 to-teal-500/10 border-b border-emerald-200/70 dark:from-emerald-500/20 dark:to-teal-500/15 dark:border-white/10">
+      <div className="rounded-2xl border border-emerald-200/80 bg-white/75 dark:border-white/15 dark:bg-white/[0.06] backdrop-blur-xl shadow-[0_8px_28px_rgba(16,185,129,0.08)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.28)]">
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500/15 to-teal-500/10 border-b border-emerald-200/70 dark:from-emerald-500/20 dark:to-teal-500/15 dark:border-white/10 rounded-t-2xl">
           <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500 text-white">
             <MapPin className="w-3 h-3" />
           </span>
@@ -331,16 +353,56 @@ const SuratJalanCard: React.FC<SuratJalanCardProps> = ({
         </div>
 
         <div className="p-4 space-y-3">
-          <div>
-            <label className="block text-xs font-bold text-emerald-900 dark:text-emerald-200 mb-1">
-              Kepada (Nama Penerima / Instansi)
-            </label>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                Kepada (Nama Penerima / Instansi)
+              </label>
+              {savedRecipients.length > 0 && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setRecipientFocused((v) => !v);
+                  }}
+                  className="text-[10px] font-bold text-orange-600 hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200"
+                >
+                  Pilih Alamat ({savedRecipients.length})
+                </button>
+              )}
+            </div>
             <input
               type="text"
               value={data.kepada}
-              onChange={(e) => onChange({ kepada: e.target.value })}
+              onFocus={() => setRecipientFocused(true)}
+              onBlur={() => setRecipientFocused(false)}
+              onChange={(e) => {
+                onChange({ kepada: e.target.value });
+                setRecipientFocused(true);
+              }}
               placeholder="Contoh: BU INA LAUNDRY / Hj. Kamila"
               className="w-full rounded-lg border border-emerald-200/90 bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 placeholder:text-slate-400 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
+            />
+            <RecipientSuggestionsDropdown
+              visible={recipientFocused}
+              suggestions={filterRecipientSuggestions(savedRecipients, data.kepada)}
+              onSelect={(rec) => {
+                const nextRows =
+                  data.rows.length > 0 &&
+                  !data.rows[0].namaBarang.trim() &&
+                  rec.lastItemName
+                    ? data.rows.map((r, i) =>
+                        i === 0 ? { ...r, namaBarang: rec.lastItemName } : r
+                      )
+                    : data.rows;
+                onChange({
+                  kepada: rec.recipientName,
+                  alamat: rec.address || data.alamat,
+                  telepon: rec.phone || data.telepon,
+                  rows: nextRows,
+                });
+                setRecipientFocused(false);
+              }}
             />
           </div>
 
@@ -417,15 +479,26 @@ const SuratJalanCard: React.FC<SuratJalanCardProps> = ({
                 </button>
               </div>
 
-              <div>
+              <div className="relative">
                 <input
                   type="text"
                   value={row.namaBarang}
-                  onChange={(e) =>
-                    handleUpdateRow(row.id, { namaBarang: e.target.value })
-                  }
+                  onFocus={() => setFocusedRowItemId(row.id)}
+                  onBlur={() => setFocusedRowItemId(null)}
+                  onChange={(e) => {
+                    handleUpdateRow(row.id, { namaBarang: e.target.value });
+                    setFocusedRowItemId(row.id);
+                  }}
                   placeholder="Nama Barang (contoh: MAP RAPORT LAMA KARTON)"
                   className="w-full rounded-lg border border-orange-200/90 bg-white/90 px-3 py-1.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
+                />
+                <ItemSuggestionsDropdown
+                  visible={focusedRowItemId === row.id}
+                  suggestions={filterItemSuggestions(savedItems, row.namaBarang)}
+                  onSelect={(s) => {
+                    handleUpdateRow(row.id, { namaBarang: s.itemName });
+                    setFocusedRowItemId(null);
+                  }}
                 />
               </div>
 
@@ -566,6 +639,8 @@ export const SuratJalanForm: React.FC<SuratJalanFormProps> = ({
   activeId,
   sender,
   hasResiData,
+  savedRecipients = [],
+  savedItems = [],
   onSenderChange,
   onFocus,
   onChange,
@@ -604,6 +679,8 @@ export const SuratJalanForm: React.FC<SuratJalanFormProps> = ({
             isCollapsed={Boolean(collapsedMap[item.id])}
             sender={sender}
             hasResiData={hasResiData}
+            savedRecipients={savedRecipients}
+            savedItems={savedItems}
             onToggleCollapse={() =>
               setCollapsedMap((prev) => ({
                 ...prev,

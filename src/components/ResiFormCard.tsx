@@ -20,13 +20,29 @@ import {
   KELOMPOK_COLOR_OPTIONS,
   MAX_BOTTOM_COLOR_ROWS,
 } from '../constants';
-import { KelompokColorId, ResiBottomRow, ResiItem } from '../types';
+import {
+  filterItemSuggestions,
+  filterRecipientSuggestions,
+} from '../services/backendSync';
+import {
+  KelompokColorId,
+  ResiBottomRow,
+  ResiItem,
+  SavedItemSuggestion,
+  SavedRecipient,
+} from '../types';
+import {
+  ItemSuggestionsDropdown,
+  RecipientSuggestionsDropdown,
+} from './AutocompleteSuggestions';
 
 interface ResiFormCardProps {
   item: ResiItem;
   index: number;
   total: number;
   isActive: boolean;
+  savedRecipients?: SavedRecipient[];
+  savedItems?: SavedItemSuggestion[];
   koliInputRef?: (el: HTMLInputElement | null) => void;
   onFocus: () => void;
   onChange: (patch: Partial<ResiItem>) => void;
@@ -59,6 +75,8 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
   index,
   total,
   isActive,
+  savedRecipients = [],
+  savedItems = [],
   koliInputRef,
   onFocus,
   onChange,
@@ -68,6 +86,8 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
   onMoveUp,
   onMoveDown,
 }) => {
+  const [recipientFocused, setRecipientFocused] = useState(false);
+  const [itemFocused, setItemFocused] = useState(false);
   const theme = CARD_THEMES[index % CARD_THEMES.length];
   const [batchKoliInput, setBatchKoliInput] = useState<string>(() => {
     const match = item.dari.match(/\d+/);
@@ -135,13 +155,13 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
     <div
       id={`resi-card-${item.id}`}
       onClick={onFocus}
-      className={`rounded-2xl border bg-white/75 dark:bg-white/[0.06] backdrop-blur-xl transition-all overflow-hidden ${
+      className={`rounded-2xl border bg-white/75 dark:bg-white/[0.06] backdrop-blur-xl transition-all ${
         isActive ? theme.activeBorder : theme.idleBorder
       }`}
     >
       {/* Glass Card Header */}
       <div
-        className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${theme.headerBg}`}
+        className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b rounded-t-2xl ${theme.headerBg}`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <span
@@ -218,22 +238,62 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
       <div className="p-4 space-y-3.5">
         {/* Group 1: Tujuan Pengiriman */}
         <div className="rounded-xl bg-emerald-50/55 border border-emerald-200/70 dark:bg-white/[0.05] dark:border-white/10 p-3 space-y-3">
-          <div>
-            <label
-              htmlFor={`kepada-${item.id}`}
-              className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 dark:text-emerald-200 mb-1.5"
-            >
-              <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              Kepada (Penerima &amp; Alamat)
-            </label>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-1.5">
+              <label
+                htmlFor={`kepada-${item.id}`}
+                className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 dark:text-emerald-200"
+              >
+                <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                Kepada (Penerima &amp; Alamat)
+              </label>
+              {savedRecipients.length > 0 && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setRecipientFocused((v) => !v);
+                  }}
+                  className="text-[10px] font-bold text-orange-600 hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200"
+                >
+                  Pilih Alamat ({savedRecipients.length})
+                </button>
+              )}
+            </div>
             <textarea
               id={`kepada-${item.id}`}
               rows={3}
               value={item.kepada}
-              onFocus={onFocus}
-              onChange={(e) => onChange({ kepada: e.target.value })}
+              onFocus={() => {
+                onFocus();
+                setRecipientFocused(true);
+              }}
+              onBlur={() => setRecipientFocused(false)}
+              onChange={(e) => {
+                onChange({ kepada: e.target.value });
+                setRecipientFocused(true);
+              }}
               placeholder={"TK ABA Kauman Yogyakarta\nJl. Kauman GM I/163, Yogyakarta"}
               className="w-full rounded-lg border border-emerald-200/90 bg-white/90 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25 resize-y leading-relaxed"
+            />
+            <RecipientSuggestionsDropdown
+              visible={recipientFocused}
+              suggestions={filterRecipientSuggestions(savedRecipients, item.kepada)}
+              onSelect={(rec) => {
+                const fullKepada = rec.address
+                  ? `${rec.recipientName}\n${rec.address}`
+                  : rec.recipientName;
+                const patch: Partial<ResiItem> = {
+                  kepada: fullKepada,
+                  noHp: rec.phone || item.noHp,
+                };
+                if (!item.namaBarang.trim() && rec.lastItemName) {
+                  patch.namaBarang = rec.lastItemName;
+                  patch.colorId = rec.lastColorId;
+                }
+                onChange(patch);
+                setRecipientFocused(false);
+              }}
             />
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
               Baris pertama otomatis dicetak lebih tebal.
@@ -312,7 +372,7 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 relative">
                 <label
                   htmlFor={`barang-${item.id}`}
                   className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 mb-1"
@@ -324,10 +384,28 @@ export const ResiFormCard: React.FC<ResiFormCardProps> = ({
                   id={`barang-${item.id}`}
                   type="text"
                   value={item.namaBarang}
-                  onFocus={onFocus}
-                  onChange={(e) => onChange({ namaBarang: e.target.value })}
+                  onFocus={() => {
+                    onFocus();
+                    setItemFocused(true);
+                  }}
+                  onBlur={() => setItemFocused(false)}
+                  onChange={(e) => {
+                    onChange({ namaBarang: e.target.value });
+                    setItemFocused(true);
+                  }}
                   placeholder="Contoh: BUKU PAKET KELOMPOK A"
                   className="w-full rounded-lg border border-orange-200/90 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 dark:border-white/15 dark:bg-black/25 dark:text-white focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/25"
+                />
+                <ItemSuggestionsDropdown
+                  visible={itemFocused}
+                  suggestions={filterItemSuggestions(savedItems, item.namaBarang)}
+                  onSelect={(s) => {
+                    onChange({
+                      namaBarang: s.itemName,
+                      colorId: s.defaultColorId,
+                    });
+                    setItemFocused(false);
+                  }}
                 />
               </div>
 

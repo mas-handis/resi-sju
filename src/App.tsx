@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { User } from '@supabase/supabase-js';
 import {
+  BookUser,
   CheckCircle2,
   ClipboardList,
+  Cloud,
   Eye,
   FileDown,
   FileSpreadsheet,
@@ -12,11 +15,13 @@ import {
   Plus,
   Printer,
   RotateCcw,
+  Save,
   Sparkles,
   Sun,
   Trash2,
 } from 'lucide-react';
 import { A3Sheet } from './components/A3Sheet';
+import { CloudHubModal, CloudHubTab } from './components/CloudHubModal';
 import { PreviewPane } from './components/PreviewPane';
 import { ResiFormCard } from './components/ResiFormCard';
 import { SenderHeaderCard } from './components/SenderHeaderCard';
@@ -35,7 +40,29 @@ import {
   RESI_PER_PAGE,
   SURAT_JALAN_SENDER_PRESETS,
 } from './constants';
-import { AppMode, ResiItem, SenderHeader, SuratJalanData } from './types';
+import { supabase } from './lib/supabase';
+import {
+  deleteSavedRecipient,
+  deleteShipmentRecord,
+  fetchCloudBundle,
+  learnFromResiBatch,
+  learnFromSuratJalanBatch,
+  loadLocalHistory,
+  loadLocalItemCatalog,
+  loadLocalRecipients,
+  recordRecipientUsage,
+  saveShipmentRecord,
+  syncLocalCacheToCloud,
+} from './services/backendSync';
+import {
+  AppMode,
+  ResiItem,
+  SavedItemSuggestion,
+  SavedRecipient,
+  SenderHeader,
+  ShipmentRecord,
+  SuratJalanData,
+} from './types';
 import { downloadResiExcel, downloadSuratJalanExcel } from './utils/exportExcel';
 import { downloadA4Pdf } from './utils/exportSheet';
 import { downloadSuratJalanPdf } from './utils/exportSuratJalanPdf';
@@ -68,6 +95,70 @@ export function App() {
   });
   const [exportingType, setExportingType] = useState<'pdf' | 'excel' | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>(() =>
+    loadLocalRecipients()
+  );
+  const [savedItems, setSavedItems] = useState<SavedItemSuggestion[]>(() =>
+    loadLocalItemCatalog()
+  );
+  const [shipmentHistory, setShipmentHistory] = useState<ShipmentRecord[]>(() =>
+    loadLocalHistory()
+  );
+  const [cloudModalOpen, setCloudModalOpen] = useState(false);
+  const [cloudInitialTab, setCloudInitialTab] = useState<CloudHubTab>('addresses');
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [isSavingCloud, setIsSavingCloud] = useState(false);
+
+  const reloadLocalStores = useCallback(() => {
+    setSavedRecipients(loadLocalRecipients());
+    setSavedItems(loadLocalItemCatalog());
+    setShipmentHistory(loadLocalHistory());
+  }, []);
+
+  const refreshCloudData = useCallback(async () => {
+    setIsSyncingCloud(true);
+    try {
+      const bundle = await fetchCloudBundle();
+      setSavedRecipients(bundle.recipients);
+      setSavedItems(bundle.items);
+      setShipmentHistory(bundle.history);
+    } catch (err) {
+      console.error('Gagal mengambil data cloud:', err);
+      reloadLocalStores();
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  }, [reloadLocalStores]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      const u = data.session?.user ?? null;
+      setAuthUser(u);
+      if (u) {
+        void refreshCloudData();
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null;
+      setAuthUser(u);
+      if (u) {
+        void refreshCloudData();
+      } else {
+        reloadLocalStores();
+      }
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [refreshCloudData, reloadLocalStores]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', themeMode === 'dark');
@@ -360,10 +451,138 @@ export function App() {
     });
   };
 
+  const learnCurrentBatch = async () => {
+    const isAuth = Boolean(authUser);
+    try {
+      if (appMode === 'surat_jalan') {
+        await learnFromSuratJalanBatch(suratJalanList, isAuth);
+      } else {
+        await learnFromResiBatch(resiList, isAuth);
+      }
+      if (isAuth) {
+        await refreshCloudData();
+      } else {
+        reloadLocalStores();
+      }
+    } catch (err) {
+      console.error('Learn batch failed:', err);
+    }
+  };
+
+  const handleSaveToDatabase = async () => {
+    if (isSavingCloud) return;
+    setIsSavingCloud(true);
+    const isAuth = Boolean(authUser);
+    try {
+      const currentSender = appMode === 'surat_jalan' ? sjSender : sender;
+      await saveShipmentRecord(
+        {
+          docType: appMode,
+          sender: currentSender,
+          resiList,
+          suratJalanList,
+        },
+        isAuth
+      );
+      if (isAuth) {
+        await refreshCloudData();
+      } else {
+        reloadLocalStores();
+      }
+      showToast(
+        isAuth
+          ? 'Tersimpan ke Database Supabase & Buku Alamat diperbarui.'
+          : 'Tersimpan di perangkat & Buku Alamat diperbarui (masuk Cloud untuk sinkron).'
+      );
+    } catch (err) {
+      console.error('Save record failed:', err);
+      showToast('Gagal menyimpan ke database.');
+    } finally {
+      setIsSavingCloud(false);
+    }
+  };
+
+  const handleUseSavedRecipient = (rec: SavedRecipient) => {
+    if (appMode === 'surat_jalan') {
+      const targetId = activeSjId || suratJalanList[0]?.id;
+      setSuratJalanList((prev) =>
+        prev.map((sj, idx) => {
+          const match = targetId ? sj.id === targetId : idx === 0;
+          if (!match) return sj;
+          const nextRows =
+            sj.rows.length > 0 && !sj.rows[0].namaBarang.trim() && rec.lastItemName
+              ? sj.rows.map((r, rIdx) =>
+                  rIdx === 0 ? { ...r, namaBarang: rec.lastItemName } : r
+                )
+              : sj.rows;
+          return {
+            ...sj,
+            kepada: rec.recipientName,
+            alamat: rec.address || sj.alamat,
+            telepon: rec.phone || sj.telepon,
+            rows: nextRows,
+          };
+        })
+      );
+      showToast(`Alamat "${rec.recipientName}" diisikan ke Surat Jalan.`);
+    } else {
+      const targetId = activeResiId || resiList[0]?.id;
+      const fullKepada = rec.address
+        ? `${rec.recipientName}\n${rec.address}`
+        : rec.recipientName;
+      setResiList((prev) =>
+        prev.map((item, idx) => {
+          const match = targetId ? item.id === targetId : idx === 0;
+          if (!match) return item;
+          return {
+            ...item,
+            kepada: fullKepada,
+            noHp: rec.phone || item.noHp,
+            namaBarang: item.namaBarang.trim() ? item.namaBarang : rec.lastItemName,
+            colorId: item.namaBarang.trim() ? item.colorId : rec.lastColorId,
+          };
+        })
+      );
+      showToast(`Alamat "${rec.recipientName}" diisikan ke Resi.`);
+    }
+  };
+
+  const handleLoadShipmentRecord = (record: ShipmentRecord) => {
+    if (record.docType === 'surat_jalan') {
+      const loaded = record.payload as SuratJalanData[];
+      if (Array.isArray(loaded) && loaded.length > 0) {
+        setAppMode('surat_jalan');
+        if (record.senderSnapshot) {
+          setSjSender(record.senderSnapshot);
+        }
+        setSuratJalanList(loaded);
+        setActiveSjId(loaded[0].id);
+        showToast(`Riwayat Surat Jalan "${record.title}" dimuat.`);
+      }
+    } else {
+      const loaded = record.payload as ResiItem[];
+      if (Array.isArray(loaded) && loaded.length > 0) {
+        setAppMode('resi');
+        if (record.senderSnapshot) {
+          setSender(record.senderSnapshot);
+        }
+        setResiList(loaded);
+        setActiveResiId(loaded[0].id);
+        showToast(`Riwayat ${loaded.length} Resi "${record.title}" dimuat.`);
+      }
+    }
+  };
+
+  const handlePrint = () => {
+    void learnCurrentBatch();
+    window.print();
+  };
+
   const handleExport = async (type: 'pdf' | 'excel') => {
     if (exportingType) return;
     setExportingType(type);
     try {
+      void learnCurrentBatch();
       let result: string;
       if (appMode === 'surat_jalan') {
         result =
@@ -483,6 +702,41 @@ export function App() {
 
             <button
               type="button"
+              onClick={() => {
+                setCloudInitialTab('addresses');
+                setCloudModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-bold text-emerald-900 dark:text-white hover:bg-white dark:hover:bg-white/20 transition-colors shadow-xs"
+              title="Buka Buku Alamat, Riwayat Pengiriman & Akun Cloud Supabase"
+            >
+              {authUser ? (
+                <Cloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <BookUser className="w-3.5 h-3.5 text-orange-600 dark:text-orange-300" />
+              )}
+              <span className="hidden md:inline">Database</span>
+              <span className="rounded-full bg-emerald-500/15 dark:bg-emerald-500/30 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:text-emerald-200">
+                {savedRecipients.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isSavingCloud}
+              onClick={() => void handleSaveToDatabase()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 dark:border-emerald-400/40 bg-emerald-100/80 dark:bg-emerald-500/20 backdrop-blur-md px-3 py-2 text-xs font-bold text-emerald-900 dark:text-emerald-100 hover:bg-emerald-200 dark:hover:bg-emerald-500/35 disabled:opacity-50 transition-colors"
+              title="Simpan pengiriman ini ke Riwayat & perbarui rekomendasi alamat"
+            >
+              {isSavingCloud ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden lg:inline">Simpan</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleLoadSample}
               className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-orange-300 dark:border-orange-400/40 bg-orange-100/90 dark:bg-orange-500/20 backdrop-blur-md px-3.5 py-2 text-xs font-bold text-orange-900 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-500/35 dark:hover:text-white transition-colors"
               title="Isi formulir dengan contoh pengisian"
@@ -503,7 +757,7 @@ export function App() {
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrint}
               className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-semibold text-emerald-900 dark:text-white hover:bg-white dark:hover:bg-white/20 transition-colors"
               title="Cetak langsung ke printer kertas A4"
             >
@@ -613,6 +867,8 @@ export function App() {
                   activeId={activeSjId}
                   sender={sjSender}
                   hasResiData={resiList.some(isResiFilled)}
+                  savedRecipients={savedRecipients}
+                  savedItems={savedItems}
                   onSenderChange={setSjSender}
                   onFocus={setActiveSjId}
                   onChange={handleUpdateSuratJalan}
@@ -636,6 +892,8 @@ export function App() {
                         index={idx}
                         total={resiList.length}
                         isActive={activeResiId === item.id}
+                        savedRecipients={savedRecipients}
+                        savedItems={savedItems}
                         koliInputRef={(el) => {
                           koliRefs.current[item.id] = el;
                         }}
@@ -768,6 +1026,58 @@ export function App() {
           </div>
         )}
       </div>
+
+      {/* Cloud Database, Address Book & History Modal */}
+      <CloudHubModal
+        isOpen={cloudModalOpen}
+        initialTab={cloudInitialTab}
+        onClose={() => setCloudModalOpen(false)}
+        user={authUser}
+        recipients={savedRecipients}
+        history={shipmentHistory}
+        isSyncing={isSyncingCloud}
+        appMode={appMode}
+        onRefreshCloud={refreshCloudData}
+        onSyncLocalToCloud={async () => {
+          setIsSyncingCloud(true);
+          try {
+            await syncLocalCacheToCloud();
+            await refreshCloudData();
+            showToast('Data lokal berhasil disinkronkan ke Supabase Cloud.');
+          } finally {
+            setIsSyncingCloud(false);
+          }
+        }}
+        onSaveRecipientManual={async (input) => {
+          await recordRecipientUsage(input, Boolean(authUser));
+          if (authUser) {
+            await refreshCloudData();
+          } else {
+            reloadLocalStores();
+          }
+          showToast(`Alamat "${input.recipientName}" disimpan ke Buku Alamat.`);
+        }}
+        onUseRecipient={handleUseSavedRecipient}
+        onDeleteRecipient={async (id) => {
+          await deleteSavedRecipient(id, Boolean(authUser));
+          if (authUser) {
+            await refreshCloudData();
+          } else {
+            reloadLocalStores();
+          }
+          showToast('Alamat dihapus.');
+        }}
+        onLoadRecord={handleLoadShipmentRecord}
+        onDeleteRecord={async (id) => {
+          await deleteShipmentRecord(id, Boolean(authUser));
+          if (authUser) {
+            await refreshCloudData();
+          } else {
+            reloadLocalStores();
+          }
+          showToast('Riwayat dihapus.');
+        }}
+      />
 
       {/* Off-screen Multi-Page Unscaled A4 Export Target + Native Print Surface */}
       <div ref={exportRef} aria-hidden="true" className="print-only-sheet offscreen-print-sheet">

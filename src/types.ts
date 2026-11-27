@@ -61,3 +61,37 @@ export interface SuratJalanData {
   footnote: string;
   showCopyLabels: boolean;
 }
+
+export interface SavedRecipient {
+  id: string;
+  recipientName: string;
+  address: string;
+  phone: string;
+  lastItemName: string;
+  lastColorId: KelompokColorId;
+  normalizedKey: string;
+  useCount: number;
+  lastUsedAt: string;
+}
+
+export interface SavedItemSuggestion {
+  id: string;
+  itemName: string;
+  defaultColorId: KelompokColorId;
+  normalizedName: string;
+  useCount: number;
+  lastUsedAt: string;
+}
+
+export interface ShipmentRecord {
+  id: string;
+  docType: AppMode;
+  presetId: SenderPresetId;
+  title: string;
+  recipientSummary: string;
+  itemCount: number;
+  totalKoli: number;
+  senderSnapshot: SenderHeader;
+  payload: ResiItem[] | SuratJalanData[];
+  createdAt: string;
+}
