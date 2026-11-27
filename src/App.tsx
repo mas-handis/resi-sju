@@ -50,11 +50,14 @@ export function App() {
   const [sender, setSender] = useState<SenderHeader>(DEFAULT_SENDER_HEADER);
   const [resiList, setResiList] = useState<ResiItem[]>(() => [createEmptyResi()]);
   const [sjSender, setSjSender] = useState<SenderHeader>(SURAT_JALAN_SENDER_PRESETS.sm);
-  const [suratJalan, setSuratJalan] = useState<SuratJalanData>(() =>
-    createEmptySuratJalan('sm')
-  );
+  const [suratJalanList, setSuratJalanList] = useState<SuratJalanData[]>(() => [
+    createEmptySuratJalan('sm'),
+  ]);
   const [showCutLines, setShowCutLines] = useState<boolean>(true);
   const [activeResiId, setActiveResiId] = useState<string | null>(() => resiList[0]?.id ?? null);
+  const [activeSjId, setActiveSjId] = useState<string | null>(
+    () => suratJalanList[0]?.id ?? null
+  );
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
     try {
@@ -201,7 +204,9 @@ export function App() {
 
   const handleClearAll = () => {
     if (appMode === 'surat_jalan') {
-      setSuratJalan(createEmptySuratJalan(sjSender.presetId));
+      const fresh = createEmptySuratJalan(sjSender.presetId);
+      setSuratJalanList([fresh]);
+      setActiveSjId(fresh.id);
       showToast('Formulir Surat Jalan dibersihkan.');
       return;
     }
@@ -217,7 +222,9 @@ export function App() {
 
   const handleLoadSample = () => {
     if (appMode === 'surat_jalan') {
-      setSuratJalan(createSampleSuratJalan(sjSender.presetId));
+      const sample = createSampleSuratJalan(sjSender.presetId);
+      setSuratJalanList([sample]);
+      setActiveSjId(sample.id);
       showToast(
         `Contoh Surat Jalan ${
           sjSender.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah'
@@ -231,7 +238,86 @@ export function App() {
     showToast(`Contoh ${samples.length} resi TK ABA dimuat.`);
   };
 
-  const handleCopyFromResiToSuratJalan = () => {
+  const handleUpdateSuratJalan = (id: string, patch: Partial<SuratJalanData>) => {
+    setSuratJalanList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    );
+  };
+
+  const handleAddSuratJalan = () => {
+    const next = createEmptySuratJalan(sjSender.presetId);
+    setSuratJalanList((prev) => [...prev, next]);
+    setActiveSjId(next.id);
+    showToast(`Surat Jalan #${suratJalanList.length + 1} ditambahkan.`);
+    requestAnimationFrame(() => {
+      document.getElementById(`sj-card-${next.id}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    });
+  };
+
+  const handleDuplicateSuratJalan = (sourceIndex: number) => {
+    const source = suratJalanList[sourceIndex];
+    if (!source) return;
+    const duplicated: SuratJalanData = {
+      ...source,
+      id: crypto.randomUUID(),
+      rows: source.rows.map((r) => ({ ...r, id: crypto.randomUUID() })),
+    };
+    setSuratJalanList((prev) => {
+      const next = [...prev];
+      next.splice(sourceIndex + 1, 0, duplicated);
+      return next;
+    });
+    setActiveSjId(duplicated.id);
+    showToast(
+      `Surat Jalan #${sourceIndex + 1} diduplikasi ke Halaman #${sourceIndex + 2}.`
+    );
+    requestAnimationFrame(() => {
+      document.getElementById(`sj-card-${duplicated.id}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    });
+  };
+
+  const handleDeleteSuratJalan = (id: string) => {
+    if (suratJalanList.length <= 1) {
+      const fresh = createEmptySuratJalan(sjSender.presetId);
+      setSuratJalanList([fresh]);
+      setActiveSjId(fresh.id);
+      return;
+    }
+    setSuratJalanList((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      if (activeSjId === id) {
+        setActiveSjId(next[0]?.id ?? null);
+      }
+      return next;
+    });
+  };
+
+  const handleMoveSuratJalan = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= suratJalanList.length) return;
+    setSuratJalanList((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved);
+      return next;
+    });
+  };
+
+  const handleSelectSjSheet = (id: string) => {
+    setActiveSjId(id);
+    document.getElementById(`sj-card-${id}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  };
+
+  const handleCopyFromResiToSuratJalan = (targetId?: string) => {
     const first = resiList[0];
     if (!first) return;
     const lines = first.kepada
@@ -244,19 +330,25 @@ export function App() {
     const totalKoliMatch = first.dari.trim().match(/^(\d+)/);
     const defaultKoli = totalKoliMatch ? totalKoliMatch[1] : '';
 
-    setSuratJalan((prev) => ({
-      ...prev,
-      kepada: penerima || prev.kepada,
-      alamat: alamat || prev.alamat,
-      telepon: first.noHp.trim() || prev.telepon,
-      rows: bottomRows.map((row, idx) => ({
-        id: crypto.randomUUID(),
-        namaBarang: row.namaBarang,
-        qty: row.qty,
-        jumlahKoli: idx === 0 ? defaultKoli : '',
-        keterangan: '',
-      })),
-    }));
+    setSuratJalanList((prev) =>
+      prev.map((sj, idx) => {
+        const shouldUpdate = targetId ? sj.id === targetId : idx === 0;
+        if (!shouldUpdate) return sj;
+        return {
+          ...sj,
+          kepada: penerima || sj.kepada,
+          alamat: alamat || sj.alamat,
+          telepon: first.noHp.trim() || sj.telepon,
+          rows: bottomRows.map((row, rowIdx) => ({
+            id: crypto.randomUUID(),
+            namaBarang: row.namaBarang,
+            qty: row.qty,
+            jumlahKoli: rowIdx === 0 ? defaultKoli : '',
+            keterangan: '',
+          })),
+        };
+      })
+    );
     showToast('Data tujuan & barang disalin dari Resi #1 ke Surat Jalan.');
   };
 
@@ -276,8 +368,8 @@ export function App() {
       if (appMode === 'surat_jalan') {
         result =
           type === 'pdf'
-            ? await downloadSuratJalanPdf(suratJalan, sjSender, showCutLines)
-            : downloadSuratJalanExcel(suratJalan, sjSender);
+            ? await downloadSuratJalanPdf(suratJalanList, sjSender, showCutLines)
+            : downloadSuratJalanExcel(suratJalanList, sjSender);
       } else {
         result =
           type === 'pdf'
@@ -465,7 +557,9 @@ export function App() {
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
-              {appMode === 'surat_jalan' ? 'Formulir Surat Jalan' : `Formulir (${resiList.length} Resi)`}
+              {appMode === 'surat_jalan'
+                ? `Formulir (${suratJalanList.length} SJ)`
+                : `Formulir (${resiList.length} Resi)`}
             </button>
             <button
               type="button"
@@ -477,7 +571,9 @@ export function App() {
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              {appMode === 'surat_jalan' ? 'Pratinjau A4' : `Pratinjau A4 (${pages.length})`}
+              {appMode === 'surat_jalan'
+                ? `Pratinjau A4 (${suratJalanList.length})`
+                : `Pratinjau A4 (${pages.length})`}
             </button>
           </div>
         </div>
@@ -513,13 +609,17 @@ export function App() {
 
               {appMode === 'surat_jalan' ? (
                 <SuratJalanForm
-                  data={suratJalan}
+                  items={suratJalanList}
+                  activeId={activeSjId}
                   sender={sjSender}
                   hasResiData={resiList.some(isResiFilled)}
                   onSenderChange={setSjSender}
-                  onChange={(patch) =>
-                    setSuratJalan((prev) => ({ ...prev, ...patch }))
-                  }
+                  onFocus={setActiveSjId}
+                  onChange={handleUpdateSuratJalan}
+                  onAdd={handleAddSuratJalan}
+                  onDuplicate={handleDuplicateSuratJalan}
+                  onDelete={handleDeleteSuratJalan}
+                  onMove={handleMoveSuratJalan}
                   onCopyFromResi={handleCopyFromResiToSuratJalan}
                 />
               ) : (
@@ -580,10 +680,12 @@ export function App() {
           >
             {appMode === 'surat_jalan' ? (
               <SuratJalanPreviewPane
-                data={suratJalan}
+                items={suratJalanList}
                 sender={sjSender}
                 showCutLines={showCutLines}
+                activeId={activeSjId}
                 onToggleCutLines={() => setShowCutLines((v) => !v)}
+                onSelectSheet={handleSelectSjSheet}
               />
             ) : (
               <PreviewPane
@@ -608,7 +710,9 @@ export function App() {
             >
               <Eye className="w-4 h-4 flex-shrink-0" />
               <span>
-                {appMode === 'surat_jalan' ? 'Pratinjau' : `Pratinjau (${pages.length})`}
+                {appMode === 'surat_jalan'
+                  ? `Pratinjau (${suratJalanList.length})`
+                  : `Pratinjau (${pages.length})`}
               </span>
             </button>
             <button
@@ -668,13 +772,15 @@ export function App() {
       {/* Off-screen Multi-Page Unscaled A4 Export Target + Native Print Surface */}
       <div ref={exportRef} aria-hidden="true" className="print-only-sheet offscreen-print-sheet">
         {appMode === 'surat_jalan' ? (
-          <div className="print-page-wrapper">
-            <SuratJalanSheet
-              data={suratJalan}
-              sender={sjSender}
-              showCutLines={showCutLines}
-            />
-          </div>
+          suratJalanList.map((sjItem) => (
+            <div key={`export-sj-${sjItem.id}`} className="print-page-wrapper">
+              <SuratJalanSheet
+                data={sjItem}
+                sender={sjSender}
+                showCutLines={showCutLines}
+              />
+            </div>
+          ))
         ) : (
           pages.map((pageItems, pageIdx) => (
             <div key={`export-page-${pageIdx}`} className="print-page-wrapper">

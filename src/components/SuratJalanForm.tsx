@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
   Calendar,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
+  Copy,
   CopyCheck,
   FileText,
   MapPin,
@@ -23,20 +28,53 @@ import { SenderHeader, SuratJalanData, SuratJalanRow } from '../types';
 import { SenderHeaderCard } from './SenderHeaderCard';
 
 interface SuratJalanFormProps {
-  data: SuratJalanData;
+  items: SuratJalanData[];
+  activeId: string | null;
   sender: SenderHeader;
   hasResiData: boolean;
   onSenderChange: (next: SenderHeader) => void;
+  onFocus: (id: string) => void;
+  onChange: (id: string, patch: Partial<SuratJalanData>) => void;
+  onAdd: () => void;
+  onDuplicate: (index: number) => void;
+  onDelete: (id: string) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onCopyFromResi: (targetId: string) => void;
+}
+
+interface SuratJalanCardProps {
+  data: SuratJalanData;
+  index: number;
+  total: number;
+  isActive: boolean;
+  isCollapsed: boolean;
+  sender: SenderHeader;
+  hasResiData: boolean;
+  onToggleCollapse: () => void;
+  onFocus: () => void;
   onChange: (patch: Partial<SuratJalanData>) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onCopyFromResi: () => void;
 }
 
-export const SuratJalanForm: React.FC<SuratJalanFormProps> = ({
+const SuratJalanCard: React.FC<SuratJalanCardProps> = ({
   data,
+  index,
+  total,
+  isActive,
+  isCollapsed,
   sender,
   hasResiData,
-  onSenderChange,
+  onToggleCollapse,
+  onFocus,
   onChange,
+  onDuplicate,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
   onCopyFromResi,
 }) => {
   const totalQty = data.rows.reduce(
@@ -89,26 +127,127 @@ export const SuratJalanForm: React.FC<SuratJalanFormProps> = ({
     });
   };
 
-  return (
-    <div className="space-y-4">
-      {/* 1. Kop Pengirim (SM & SJU) */}
-      <SenderHeaderCard
-        sender={sender}
-        onChange={onSenderChange}
-        presets={SURAT_JALAN_SENDER_PRESETS}
-      />
+  const summaryLabel = [data.nomor.trim(), data.kepada.trim()]
+    .filter(Boolean)
+    .join(' • ');
 
-      {/* Quick Import from Resi */}
-      {hasResiData && (
+  return (
+    <div
+      id={`sj-card-${data.id}`}
+      onClick={onFocus}
+      className={`rounded-2xl border bg-white/75 dark:bg-white/[0.06] backdrop-blur-xl transition-all overflow-hidden ${
+        isActive
+          ? 'border-orange-400/80 ring-2 ring-orange-500/20 shadow-[0_8px_32px_rgba(249,115,22,0.14)] dark:border-orange-400/70 dark:ring-orange-500/25 dark:shadow-[0_8px_32px_rgba(249,115,22,0.18)]'
+          : 'border-emerald-200/80 hover:border-emerald-400/70 shadow-[0_8px_28px_rgba(16,185,129,0.08)] dark:border-white/15 dark:hover:border-emerald-400/50 dark:shadow-[0_8px_28px_rgba(0,0,0,0.28)]'
+      }`}
+    >
+      {/* Card Header: Surat Jalan #N + Duplicate / Move / Delete / Collapse */}
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500/15 to-orange-500/10 border-b border-emerald-200/70 dark:from-emerald-500/20 dark:to-orange-500/15 dark:border-white/10">
         <button
           type="button"
-          onClick={onCopyFromResi}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-orange-300 bg-orange-50/85 backdrop-blur-md px-3.5 py-2.5 text-xs font-bold text-orange-800 hover:bg-orange-100/90 dark:border-orange-400/40 dark:bg-orange-500/15 dark:text-orange-200 dark:hover:bg-orange-500/25 dark:hover:text-white transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFocus();
+            onToggleCollapse();
+          }}
+          className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+          title={isCollapsed ? 'Buka formulir Surat Jalan ini' : 'Ciutkan formulir'}
         >
-          <CopyCheck className="w-4 h-4 text-orange-500 dark:text-orange-400" />
-          Ambil Data Tujuan &amp; Barang dari Resi #1
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-xs font-extrabold text-white shadow-sm flex-shrink-0">
+            {index + 1}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                Surat Jalan #{index + 1}
+              </span>
+              <span className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-200/80 flex-shrink-0">
+                • Hal. {index + 1}
+              </span>
+            </div>
+            {isCollapsed && summaryLabel && (
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
+                {summaryLabel}
+              </p>
+            )}
+          </div>
+          {isCollapsed ? (
+            <ChevronDown className="w-4 h-4 text-slate-500 dark:text-slate-300 flex-shrink-0" />
+          ) : (
+            <ChevronUp className="w-4 h-4 text-slate-500 dark:text-slate-300 flex-shrink-0" />
+          )}
         </button>
-      )}
+
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {total > 1 && (
+            <div className="flex items-center mr-0.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveUp();
+                }}
+                disabled={index === 0}
+                title="Pindah ke atas"
+                className="p-1 rounded-md text-slate-500 hover:text-slate-900 hover:bg-emerald-500/15 dark:text-slate-300 dark:hover:text-white dark:hover:bg-white/15 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveDown();
+                }}
+                disabled={index === total - 1}
+                title="Pindah ke bawah"
+                className="p-1 rounded-md text-slate-500 hover:text-slate-900 hover:bg-emerald-500/15 dark:text-slate-300 dark:hover:text-white dark:hover:bg-white/15 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+            title="Duplikat Surat Jalan ini ke halaman A4 baru"
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-500/25 dark:border-emerald-400/35 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/35 dark:hover:text-white transition-colors"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Duplikat</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            title={total === 1 ? 'Kosongkan isian Surat Jalan' : 'Hapus Surat Jalan ini'}
+            className="p-1.5 rounded-full text-rose-600 hover:text-rose-700 hover:bg-rose-500/15 dark:text-rose-300 dark:hover:text-white dark:hover:bg-rose-500/30 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {!isCollapsed && (
+        <div className="p-3.5 space-y-3.5">
+          {/* Quick Import from Resi */}
+          {hasResiData && (
+            <button
+              type="button"
+              onClick={onCopyFromResi}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-orange-300 bg-orange-50/85 backdrop-blur-md px-3 py-2 text-xs font-bold text-orange-800 hover:bg-orange-100/90 dark:border-orange-400/40 dark:bg-orange-500/15 dark:text-orange-200 dark:hover:bg-orange-500/25 dark:hover:text-white transition-colors"
+            >
+              <CopyCheck className="w-4 h-4 text-orange-500 dark:text-orange-400" />
+              Ambil Data Tujuan &amp; Barang dari Resi #1
+            </button>
+          )}
 
       {/* 2. Informasi Surat Jalan */}
       <div className="rounded-2xl border border-emerald-200/80 bg-white/75 dark:border-white/15 dark:bg-white/[0.06] backdrop-blur-xl shadow-[0_8px_28px_rgba(16,185,129,0.08)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.28)] overflow-hidden">
@@ -415,6 +554,86 @@ export const SuratJalanForm: React.FC<SuratJalanFormProps> = ({
             </span>
           </label>
         </div>
+      </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const SuratJalanForm: React.FC<SuratJalanFormProps> = ({
+  items,
+  activeId,
+  sender,
+  hasResiData,
+  onSenderChange,
+  onFocus,
+  onChange,
+  onAdd,
+  onDuplicate,
+  onDelete,
+  onMove,
+  onCopyFromResi,
+}) => {
+  const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (activeId) {
+      setCollapsedMap((prev) => (prev[activeId] ? { ...prev, [activeId]: false } : prev));
+    }
+  }, [activeId]);
+
+  return (
+    <div className="space-y-4">
+      {/* 1. Kop Pengirim (SM & SJU) */}
+      <SenderHeaderCard
+        sender={sender}
+        onChange={onSenderChange}
+        presets={SURAT_JALAN_SENDER_PRESETS}
+      />
+
+      {/* Surat Jalan Cards List */}
+      <div className="space-y-3.5">
+        {items.map((item, idx) => (
+          <SuratJalanCard
+            key={item.id}
+            data={item}
+            index={idx}
+            total={items.length}
+            isActive={activeId === item.id}
+            isCollapsed={Boolean(collapsedMap[item.id])}
+            sender={sender}
+            hasResiData={hasResiData}
+            onToggleCollapse={() =>
+              setCollapsedMap((prev) => ({
+                ...prev,
+                [item.id]: !prev[item.id],
+              }))
+            }
+            onFocus={() => onFocus(item.id)}
+            onChange={(patch) => onChange(item.id, patch)}
+            onDuplicate={() => onDuplicate(idx)}
+            onDelete={() => onDelete(item.id)}
+            onMoveUp={() => onMove(idx, -1)}
+            onMoveDown={() => onMove(idx, 1)}
+            onCopyFromResi={() => onCopyFromResi(item.id)}
+          />
+        ))}
+      </div>
+
+      {/* Add New Manual Surat Jalan CTA */}
+      <div className="pt-1">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/60 dark:border-emerald-400/50 bg-emerald-50/80 dark:bg-emerald-500/10 backdrop-blur-md py-3 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-200 hover:border-emerald-600 dark:hover:border-emerald-400 hover:bg-emerald-100/80 dark:hover:bg-emerald-500/20 dark:hover:text-white transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Tambah Surat Jalan Baru ({items.length} Hal. A4)
+        </button>
+        <p className="mt-2 text-center text-[11px] text-slate-600 dark:text-slate-400">
+          Klik <span className="font-semibold text-emerald-700 dark:text-emerald-300">Duplikat</span> untuk menyalin isi kertas, atau tombol di atas untuk mengisi manual dari awal.
+        </p>
       </div>
     </div>
   );

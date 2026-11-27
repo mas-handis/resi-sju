@@ -45,6 +45,7 @@ export interface SuratJalanRow {
 }
 
 export interface SuratJalanData {
+  id: string;
   nomor: string;
   tanggal: string;
   pengirim: string;

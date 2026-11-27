@@ -630,10 +630,11 @@ function drawSuratJalanCopyPdf(
 }
 
 export async function downloadSuratJalanPdf(
-  data: SuratJalanData,
+  items: SuratJalanData | SuratJalanData[],
   sender: SenderHeader,
   showCutLines: boolean
 ): Promise<string> {
+  const sheetList = Array.isArray(items) ? items : [items];
   const [logo, calibri] = await Promise.all([
     resolveLogoForPdf(sender),
     loadCalibriFonts(),
@@ -681,42 +682,48 @@ export async function downloadSuratJalanPdf(
   const cardW = A4_WIDTH_MM - marginX * 2;
   const padGap = 10 * PX_TO_MM;
 
-  // Top half: COPY
-  drawSuratJalanCopyPdf(
-    pdf,
-    fontName,
-    hasItalic,
-    hasBoldItalic,
-    data,
-    sender,
-    logo,
-    'copy',
-    marginX,
-    marginY,
-    cardW,
-    halfH - padGap
-  );
+  sheetList.forEach((data, pageIdx) => {
+    if (pageIdx > 0) {
+      pdf.addPage('a4', 'portrait');
+    }
 
-  // Middle cut line
-  if (showCutLines) {
-    drawCutLine(pdf, marginX, cardW, marginY + halfH);
-  }
+    // Top half: COPY
+    drawSuratJalanCopyPdf(
+      pdf,
+      fontName,
+      hasItalic,
+      hasBoldItalic,
+      data,
+      sender,
+      logo,
+      'copy',
+      marginX,
+      marginY,
+      cardW,
+      halfH - padGap
+    );
 
-  // Bottom half: ASLI
-  drawSuratJalanCopyPdf(
-    pdf,
-    fontName,
-    hasItalic,
-    hasBoldItalic,
-    data,
-    sender,
-    logo,
-    'original',
-    marginX,
-    marginY + halfH + padGap,
-    cardW,
-    halfH - padGap
-  );
+    // Middle cut line
+    if (showCutLines) {
+      drawCutLine(pdf, marginX, cardW, marginY + halfH);
+    }
+
+    // Bottom half: ASLI
+    drawSuratJalanCopyPdf(
+      pdf,
+      fontName,
+      hasItalic,
+      hasBoldItalic,
+      data,
+      sender,
+      logo,
+      'original',
+      marginX,
+      marginY + halfH + padGap,
+      cardW,
+      halfH - padGap
+    );
+  });
 
   pdf.save(filename);
   return filename;

@@ -271,6 +271,7 @@ export function formatShortDateId(date = new Date()): string {
 
 export function createEmptySuratJalan(presetId: SenderPresetId = 'sm'): SuratJalanData {
   return {
+    id: crypto.randomUUID(),
     nomor: presetId === 'sju' ? '01/SJU/AKBAR/X/2026' : '15/SM/MAP/2026',
     tanggal: formatShortDateId(),
     pengirim: '',
@@ -305,6 +306,7 @@ export function createEmptySuratJalan(presetId: SenderPresetId = 'sm'): SuratJal
 export function createSampleSuratJalan(presetId: SenderPresetId): SuratJalanData {
   if (presetId === 'sju') {
     return {
+      id: crypto.randomUUID(),
       nomor: '01/SJU/AKBAR/X/2026',
       tanggal: formatShortDateId(),
       pengirim: '',
@@ -338,6 +340,7 @@ export function createSampleSuratJalan(presetId: SenderPresetId): SuratJalanData
   }
 
   return {
+    id: crypto.randomUUID(),
     nomor: '15/SM/MAP/2026',
     tanggal: formatShortDateId(),
     pengirim: '',

@@ -5,17 +5,21 @@ import { SenderHeader, SuratJalanData } from '../types';
 import { SuratJalanSheet } from './SuratJalanSheet';
 
 interface SuratJalanPreviewPaneProps {
-  data: SuratJalanData;
+  items: SuratJalanData[];
   sender: SenderHeader;
   showCutLines: boolean;
+  activeId?: string | null;
   onToggleCutLines: () => void;
+  onSelectSheet?: (id: string) => void;
 }
 
 export const SuratJalanPreviewPane: React.FC<SuratJalanPreviewPaneProps> = ({
-  data,
+  items,
   sender,
   showCutLines,
+  activeId,
   onToggleCutLines,
+  onSelectSheet,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [fitScale, setFitScale] = useState(0.55);
@@ -55,6 +59,9 @@ export const SuratJalanPreviewPane: React.FC<SuratJalanPreviewPaneProps> = ({
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-xs">
             Preview Surat Jalan A4
+          </span>
+          <span className="inline-flex items-center rounded-full bg-orange-500/15 dark:bg-orange-500/25 border border-orange-300 dark:border-orange-400/40 px-2.5 py-0.5 text-[11px] font-bold text-orange-800 dark:text-orange-200">
+            {items.length} Hal. A4
           </span>
           <span className="hidden sm:inline-flex items-center rounded-full bg-white/80 dark:bg-white/10 border border-emerald-200/80 dark:border-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-900 dark:text-slate-200">
             210 × 297 mm
@@ -110,35 +117,69 @@ export const SuratJalanPreviewPane: React.FC<SuratJalanPreviewPaneProps> = ({
         </div>
       </div>
 
-      {/* Scaled A4 Viewport */}
+      {/* Scaled Multi-Page A4 Viewport */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto custom-scrollbar flex flex-col items-center p-5"
+        className="flex-1 overflow-auto custom-scrollbar flex flex-col items-center gap-6 p-5"
       >
-        <div
-          style={{
-            width: `${scaledWidth}px`,
-            height: `${scaledHeight}px`,
-            flexShrink: 0,
-            position: 'relative',
-          }}
-          className="rounded-sm bg-white shadow-[0_12px_36px_rgba(15,23,42,0.16)] ring-1 ring-slate-900/10"
-        >
-          <div
-            style={{
-              width: `${A4_PX_WIDTH}px`,
-              height: `${A4_PX_HEIGHT}px`,
-              transform: `scale(${effectiveScale})`,
-              transformOrigin: 'top left',
-            }}
-          >
-            <SuratJalanSheet
-              data={data}
-              sender={sender}
-              showCutLines={showCutLines}
-            />
-          </div>
-        </div>
+        {items.map((item, idx) => {
+          const isActive = item.id === activeId;
+          return (
+            <div key={item.id} className="flex flex-col items-center gap-2">
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onSelectSheet?.(item.id)}
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold transition-all ${
+                    isActive
+                      ? 'bg-orange-500 text-white shadow-sm'
+                      : 'bg-white/80 dark:bg-white/10 text-slate-700 dark:text-slate-200 border border-emerald-200/80 dark:border-white/15 hover:bg-white dark:hover:bg-white/20'
+                  }`}
+                >
+                  <span>Halaman {idx + 1}</span>
+                  {item.nomor.trim() && (
+                    <span className="opacity-85">• {item.nomor.trim()}</span>
+                  )}
+                  {item.kepada.trim() && (
+                    <span className="opacity-85 truncate max-w-[180px]">
+                      • {item.kepada.trim()}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              <div
+                onClick={() => onSelectSheet?.(item.id)}
+                style={{
+                  width: `${scaledWidth}px`,
+                  height: `${scaledHeight}px`,
+                  flexShrink: 0,
+                  position: 'relative',
+                }}
+                className={`rounded-sm bg-white shadow-[0_12px_36px_rgba(15,23,42,0.16)] cursor-pointer transition-all ${
+                  isActive && items.length > 1
+                    ? 'ring-2 ring-orange-500'
+                    : 'ring-1 ring-slate-900/10'
+                }`}
+              >
+                <div
+                  style={{
+                    width: `${A4_PX_WIDTH}px`,
+                    height: `${A4_PX_HEIGHT}px`,
+                    transform: `scale(${effectiveScale})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  <SuratJalanSheet
+                    data={item}
+                    sender={sender}
+                    showCutLines={showCutLines}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
