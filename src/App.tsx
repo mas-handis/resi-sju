@@ -41,13 +41,12 @@ import {
 import {
   deleteSavedRecipient,
   deleteShipmentRecord,
-  learnFromResiBatch,
-  learnFromSuratJalanBatch,
+  fetchCloudBundle,
   loadLocalHistory,
   loadLocalItemCatalog,
   loadLocalRecipients,
   recordRecipientUsage,
-  saveShipmentRecord,
+  recordShipmentWithDedup,
 } from './services/backendSync';
 import {
   AppMode,
@@ -55,6 +54,7 @@ import {
   SavedItemSuggestion,
   SavedRecipient,
   SenderHeader,
+  ShipmentActionType,
   ShipmentRecord,
   SuratJalanData,
 } from './types';
@@ -101,7 +101,9 @@ export function App() {
   );
   const [cloudModalOpen, setCloudModalOpen] = useState(false);
   const [cloudInitialTab, setCloudInitialTab] = useState<CloudHubTab>('addresses');
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [isSavingCloud, setIsSavingCloud] = useState(false);
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
   const [hasSwitchedMode, setHasSwitchedMode] = useState(false);
   const [modePillRect, setModePillRect] = useState<{ left: number; width: number; ready: boolean }>({
     left: 4,
@@ -147,6 +149,23 @@ export function App() {
     setSavedItems(loadLocalItemCatalog());
     setShipmentHistory(loadLocalHistory());
   }, []);
+
+  const syncSharedDatabase = useCallback(async () => {
+    setIsSyncingCloud(true);
+    try {
+      const bundle = await fetchCloudBundle();
+      setSavedRecipients(bundle.recipients);
+      setSavedItems(bundle.items);
+      setShipmentHistory(bundle.history);
+      setIsCloudConnected(bundle.fromCloud);
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void syncSharedDatabase();
+  }, [syncSharedDatabase]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', themeMode === 'dark');
@@ -439,16 +458,42 @@ export function App() {
     });
   };
 
-  const learnCurrentBatch = async () => {
-    try {
-      if (appMode === 'surat_jalan') {
-        await learnFromSuratJalanBatch(suratJalanList, false);
-      } else {
-        await learnFromResiBatch(resiList, false);
+  const saveCurrentShipment = async (
+    action: ShipmentActionType,
+    manualTrigger = false
+  ) => {
+    const currentSender = appMode === 'surat_jalan' ? sjSender : sender;
+    const result = await recordShipmentWithDedup({
+      docType: appMode,
+      sender: currentSender,
+      resiList,
+      suratJalanList,
+      action,
+    });
+
+    if (result.empty) {
+      if (manualTrigger) {
+        showToast('Isi minimal 1 tujuan atau nama barang sebelum menyimpan.');
       }
+      return;
+    }
+
+    if (result.cloudSynced) {
+      await syncSharedDatabase();
+    } else {
       reloadLocalStores();
-    } catch (err) {
-      console.error('Learn batch failed:', err);
+    }
+
+    if (manualTrigger) {
+      if (result.duplicate) {
+        showToast('Data pengiriman ini sudah tercatat di Riwayat (tidak didobelkan).');
+      } else {
+        showToast(
+          result.cloudSynced
+            ? 'Tersimpan ke database bersama & Riwayat Penggunaan.'
+            : 'Tersimpan di perangkat & Riwayat Penggunaan.'
+        );
+      }
     }
   };
 
@@ -456,18 +501,7 @@ export function App() {
     if (isSavingCloud) return;
     setIsSavingCloud(true);
     try {
-      const currentSender = appMode === 'surat_jalan' ? sjSender : sender;
-      await saveShipmentRecord(
-        {
-          docType: appMode,
-          sender: currentSender,
-          resiList,
-          suratJalanList,
-        },
-        false
-      );
-      reloadLocalStores();
-      showToast('Tersimpan ke Riwayat Penggunaan & Buku Alamat diperbarui.');
+      await saveCurrentShipment('save', true);
     } catch (err) {
       console.error('Save record failed:', err);
       showToast('Gagal menyimpan ke riwayat penggunaan.');
@@ -548,7 +582,7 @@ export function App() {
   };
 
   const handlePrint = () => {
-    void learnCurrentBatch();
+    void saveCurrentShipment('print');
     window.print();
   };
 
@@ -556,7 +590,9 @@ export function App() {
     if (exportingType) return;
     setExportingType(type);
     try {
-      void learnCurrentBatch();
+      const savePromise = saveCurrentShipment(type).catch((err) => {
+        console.error('Auto-save before export failed:', err);
+      });
       let result: string;
       if (appMode === 'surat_jalan') {
         result =
@@ -569,6 +605,7 @@ export function App() {
             ? await downloadA4Pdf(resiList, sender, showCutLines)
             : downloadResiExcel(resiList, sender);
       }
+      await savePromise;
       showToast(`Berhasil mengunduh ${result}`);
     } catch (err) {
       console.error('Export failed:', err);
@@ -693,6 +730,7 @@ export function App() {
               onClick={() => {
                 setCloudInitialTab('addresses');
                 setCloudModalOpen(true);
+                void syncSharedDatabase();
               }}
               className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/[0.08] backdrop-blur-md px-3 py-2 text-xs font-bold text-emerald-900 dark:text-white hover:bg-white dark:hover:bg-white/20 transition-colors shadow-xs whitespace-nowrap"
               title="Buka Riwayat Penggunaan & Buku Alamat"
@@ -1041,21 +1079,24 @@ export function App() {
         recipients={savedRecipients}
         history={shipmentHistory}
         appMode={appMode}
+        isSyncing={isSyncingCloud}
+        isCloudConnected={isCloudConnected}
+        onRefresh={syncSharedDatabase}
         onSaveRecipientManual={async (input) => {
-          await recordRecipientUsage(input, false);
-          reloadLocalStores();
+          await recordRecipientUsage(input);
+          await syncSharedDatabase();
           showToast(`Alamat "${input.recipientName}" disimpan ke Buku Alamat.`);
         }}
         onUseRecipient={handleUseSavedRecipient}
         onDeleteRecipient={async (id) => {
-          await deleteSavedRecipient(id, false);
-          reloadLocalStores();
+          await deleteSavedRecipient(id);
+          await syncSharedDatabase();
           showToast('Alamat dihapus.');
         }}
         onLoadRecord={handleLoadShipmentRecord}
         onDeleteRecord={async (id) => {
-          await deleteShipmentRecord(id, false);
-          reloadLocalStores();
+          await deleteShipmentRecord(id);
+          await syncSharedDatabase();
           showToast('Riwayat dihapus.');
         }}
       />

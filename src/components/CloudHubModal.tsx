@@ -8,14 +8,22 @@ import {
   Package,
   Phone,
   Plus,
+  RefreshCw,
   Search,
   Star,
   Trash2,
   X,
 } from 'lucide-react';
-import { AppMode, SavedRecipient, ShipmentRecord } from '../types';
+import { AppMode, SavedRecipient, ShipmentActionType, ShipmentRecord } from '../types';
 
 export type CloudHubTab = 'addresses' | 'history';
+
+const ACTION_LABELS: Record<ShipmentActionType, string> = {
+  save: 'Disimpan',
+  print: 'Dicetak',
+  pdf: 'Unduh PDF',
+  excel: 'Unduh Excel',
+};
 
 interface CloudHubModalProps {
   isOpen: boolean;
@@ -24,6 +32,9 @@ interface CloudHubModalProps {
   recipients: SavedRecipient[];
   history: ShipmentRecord[];
   appMode: AppMode;
+  isSyncing?: boolean;
+  isCloudConnected?: boolean;
+  onRefresh?: () => Promise<void>;
   onSaveRecipientManual: (input: {
     recipientName: string;
     address: string;
@@ -43,6 +54,9 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
   recipients,
   history,
   appMode,
+  isSyncing = false,
+  isCloudConnected = false,
+  onRefresh,
   onSaveRecipientManual,
   onUseRecipient,
   onDeleteRecipient,
@@ -148,19 +162,35 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
                 Riwayat Penggunaan &amp; Buku Alamat
               </h2>
               <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 truncate">
-                Rekomendasi alamat otomatis &amp; arsip pengiriman tersimpan di perangkat
+                {isCloudConnected
+                  ? 'Database bersama aktif • Semua pengguna melihat data & riwayat terbaru'
+                  : 'Otomatis tersimpan saat Simpan, Cetak, Download PDF, atau Excel'}
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-full text-slate-500 hover:text-slate-900 hover:bg-emerald-500/15 dark:text-slate-300 dark:hover:text-white dark:hover:bg-white/15 transition-colors"
-            aria-label="Tutup modal"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {onRefresh && (
+              <button
+                type="button"
+                disabled={isSyncing}
+                onClick={() => void onRefresh()}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 dark:border-white/15 bg-white/80 dark:bg-white/10 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:text-emerald-200 hover:bg-white dark:hover:bg-white/20 disabled:opacity-50 transition-colors"
+                title="Muat ulang data terbaru dari database"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Muat Ulang</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-full text-slate-500 hover:text-slate-900 hover:bg-emerald-500/15 dark:text-slate-300 dark:hover:text-white dark:hover:bg-white/15 transition-colors"
+              aria-label="Tutup modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
@@ -399,7 +429,7 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
                     Belum ada riwayat tersimpan
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Klik tombol <span className="font-bold">Simpan</span> di header untuk menyimpan batch Resi atau Surat Jalan agar bisa dicetak ulang kapan saja.
+                    Riwayat akan otomatis masuk saat Anda klik <span className="font-bold">Simpan</span>, <span className="font-bold">Cetak</span>, <span className="font-bold">Download PDF</span>, atau <span className="font-bold">Download Excel</span>.
                   </p>
                 </div>
               ) : (
@@ -428,6 +458,11 @@ export const CloudHubModal: React.FC<CloudHubModalProps> = ({
                           <span className="rounded-full bg-slate-100 dark:bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-200">
                             {rec.presetId === 'sju' ? 'SJU' : 'Suara Muhammadiyah'}
                           </span>
+                          {rec.lastAction && (
+                            <span className="rounded-full bg-emerald-500/15 dark:bg-emerald-500/25 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-200">
+                              {ACTION_LABELS[rec.lastAction]}
+                            </span>
+                          )}
                           <span className="text-[11px] text-slate-500 dark:text-slate-400">
                             {formatDateTime(rec.createdAt)}
                           </span>

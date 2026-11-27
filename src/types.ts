@@ -83,8 +83,12 @@ export interface SavedItemSuggestion {
   lastUsedAt: string;
 }
 
+export type ShipmentActionType = 'save' | 'print' | 'pdf' | 'excel';
+
 export interface ShipmentRecord {
   id: string;
+  dedupKey?: string;
+  lastAction?: ShipmentActionType;
   docType: AppMode;
   presetId: SenderPresetId;
   title: string;
